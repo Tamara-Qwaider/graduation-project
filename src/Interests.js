@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 function Interests() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const interestsList = [
     "Restaurants 🍔",
@@ -15,7 +16,9 @@ function Interests() {
     "Music 🎵"
   ];
 
-  const [selected, setSelected] = useState([]);
+  const [selected, setSelected] = useState(() => {
+    return JSON.parse(localStorage.getItem("interests")) || [];
+  });
 
   const toggleInterest = (item) => {
     if (selected.includes(item)) {
@@ -34,7 +37,11 @@ function Interests() {
     localStorage.setItem("interests", JSON.stringify(selected));
     localStorage.setItem("hasInterests", "true");
 
-    navigate("/home");
+    if (location.state?.fromProfile) {
+      navigate("/profile");
+    } else {
+      navigate("/home");
+    }
   };
 
   return (
@@ -45,78 +52,108 @@ function Interests() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background:
-          "radial-gradient(circle at 20% 20%, #9333ea, #020617 60%), radial-gradient(circle at 80% 80%, #f97316, transparent)",
+        background: "linear-gradient(135deg, #130f53, #1e1b4b, #020617)",
         color: "white",
         padding: "20px"
       }}
     >
-      <h1>Choose Your Interests 🎯</h1>
-      
+      <h1 style={{ marginBottom: "10px" }}>
+        Choose Your Interests 🎯
+      </h1>
 
-      {/* 🟣 الفقاعات */}
+      <p style={{ color: "rgba(255,255,255,0.6)" }}>
+        Pick what you love to get better suggestions
+      </p>
+
       <div
-  style={{
-    display: "flex",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: "35px",
-    marginTop: "30px",
-    maxWidth: "700px"
-  }}
->
-  {interestsList.map((item, index) => (
-    <div
-      key={item}
-      onClick={() => toggleInterest(item)}
-      onMouseEnter={(e) =>
-        (e.target.style.transform = "scale(1.1)")
-      }
-      onMouseLeave={(e) =>
-        (e.target.style.transform = "scale(1)")
-      }
-      style={{
-        width: "130px",
-        height: "130px",
-        borderRadius: "50%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-        fontSize: "14px",
-        cursor: "pointer",
-        background: selected.includes(item)
-          ? "linear-gradient(to right, #7c3aed, #ec4899)"
-          : "rgba(255,255,255,0.1)",
-        border: selected.includes(item)
-          ? "2px solid white"
-          : "1px solid rgba(255,255,255,0.2)",
-        transition: "0.3s",
-        animation: `float ${3 + (index % 3)}s ease-in-out infinite`
-      }}
-    >
-      {item}
-    </div>
-  ))}
-</div>
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          gap: "30px",
+          marginTop: "30px",
+          maxWidth: "700px"
+        }}
+      >
+        {interestsList.map((item, index) => (
+          <div
+            key={item}
+            onClick={() => toggleInterest(item)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.1)";
+              e.currentTarget.style.background = selected.includes(item)
+                ? "linear-gradient(to right, #4e219b, #e66000)"
+                : "rgba(255,255,255,0.2)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+              e.currentTarget.style.background = selected.includes(item)
+                ? "linear-gradient(to right, #4e219b, #e66000)"
+                : "rgba(255,255,255,0.08)";
+            }}
+            style={{
+              width: "130px",
+              height: "130px",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textAlign: "center",
+              fontSize: "14px",
+              cursor: "pointer",
+              background: selected.includes(item)
+                ? "linear-gradient(to right, #4e219b, #e66000)"
+                : "rgba(255,255,255,0.08)",
+              border: selected.includes(item)
+                ? "2px solid rgba(255,255,255,0.8)"
+                : "1px solid rgba(255,255,255,0.15)",
+              backdropFilter: "blur(10px)",
+              transition: "0.3s ease",
+              boxShadow: selected.includes(item)
+                ? "0 0 15px rgba(230,96,0,0.5)"
+                : "none",
+              animation: `float ${3 + (index % 3)}s ease-in-out infinite`
+            }}
+          >
+            {item}
+          </div>
+        ))}
+      </div>
 
-
-      {/* زر الحفظ */}
       <button
         onClick={handleSave}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = "scale(1.05)";
+          e.currentTarget.style.boxShadow = "0 0 25px rgba(255,138,0,0.9)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "scale(1)";
+          e.currentTarget.style.boxShadow = "0 6px 15px rgba(0,0,0,0.3)";
+        }}
         style={{
           marginTop: "40px",
           padding: "12px 30px",
-          borderRadius: "10px",
+          borderRadius: "12px",
           border: "none",
-          background: "linear-gradient(to right, #7c3aed, #ec4899)",
+          background: "linear-gradient(to right, #4e219b, #e66000)",
           color: "white",
           fontWeight: "bold",
-          cursor: "pointer"
+          cursor: "pointer",
+          transition: "0.25s ease",
+          boxShadow: "0 6px 15px rgba(0,0,0,0.3)"
         }}
       >
         Save & Continue
       </button>
+
+      <style>
+        {`
+          @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+          }
+        `}
+      </style>
     </div>
   );
 }

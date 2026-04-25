@@ -1,14 +1,14 @@
-import { useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Bookmark } from "lucide-react";
+import Navbar from "./Navbar";
 import {
-  Compass,
   Users,
-  User,
   Search,
   Star,
   X,
-  Activity
 } from "lucide-react";
+import "./HomePage.css";
 
 const placesData = [
   {
@@ -29,24 +29,84 @@ const placesData = [
     id: 2,
     name: "Dead Sea",
     category: "Suggestions",
-    image: "https://images.unsplash.com/photo-1601140434639-9f0f7b4f2d7a",
+    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
     location: "Jordan",
     rating: 4.8,
     description: "Lowest point on Earth.",
     images: [
-      "https://images.unsplash.com/photo-1601140434639-9f0f7b4f2d7a"
+      "https://images.unsplash.com/photo-1506744038136-46273834b3fb"
     ]
   },
   {
     id: 3,
     name: "Wadi Rum",
     category: "Suggestions",
-    image: "https://images.unsplash.com/photo-1610878180933-8d7f7f0f2a0d",
+    image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee",
     location: "Jordan",
     rating: 4.7,
     description: "Beautiful desert adventure.",
     images: [
-      "https://images.unsplash.com/photo-1610878180933-8d7f7f0f2a0d"
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee"
+    ]
+  },
+  {
+    id: 8,
+    name: "Jerash",
+    category: "Suggestions",
+    image: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c",
+    location: "Jordan",
+    rating: 4.8,
+    description: "Ancient Roman ruins and columns.",
+    images: [
+      "https://images.unsplash.com/photo-1512453979798-5ea266f8880c"
+    ]
+  },
+  {
+    id: 9,
+    name: "Ajloun Castle",
+    category: "Cafes",
+    image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee",
+    location: "Jordan",
+    rating: 4.7,
+    description: "Historic Islamic castle with scenic views.",
+    images: [
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee"
+    ]
+  },
+  {
+    id: 10,
+    name: "Dana Reserve",
+    category: "Suggestions",
+    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
+    location: "Jordan",
+    rating: 4.9,
+    description: "Nature reserve with breathtaking landscapes.",
+    images: [
+      "https://images.unsplash.com/photo-1506744038136-46273834b3fb"
+    ]
+  },
+  {
+    id: 11,
+    name: "Umm Qais",
+    category: "Suggestions",
+    image: "https://images.unsplash.com/photo-1493246507139-91e8fad9978e",
+    location: "Jordan",
+    rating: 4.6,
+    description: "Ancient hilltop city overlooking the valley.",
+    images: [
+      "https://images.unsplash.com/photo-1493246507139-91e8fad9978e"
+    ]
+  },
+  {
+    id: 12,
+    name: "Aqaba Beach",
+    category: "Cafes",
+    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e",
+    location: "Jordan",
+    rating: 4.8,
+    description: "Relaxing beach with clear blue water.",
+    images: [
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e"
     ]
   },
   {
@@ -94,140 +154,268 @@ const placesData = [
 export default function Home() {
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
+  const [savedPlaces, setSavedPlaces] = useState(() => {
+    return JSON.parse(localStorage.getItem("savedPlaces")) || [];
+  });
 
   const navigate = useNavigate();
 
-  // ✅ أهم تعديل هنا (ديناميكي)
-  const categories = [...new Set(placesData.map(p => p.category))];
+  const categories = [...new Set(placesData.map((p) => p.category))];
+  const userInterests =
+  JSON.parse(localStorage.getItem("interests")) || [];
+
+ const cleanText = (text) =>
+  text.toLowerCase().replace(/[^\w\s]/g, "").trim();
+
+const recommendedPlaces = placesData.filter((place) =>
+  userInterests.some((interest) => {
+    const cleanInterest = cleanText(interest);
+    const cleanCategory = cleanText(place.category);
+
+    return (
+      cleanInterest.includes(cleanCategory) ||
+      cleanCategory.includes(cleanInterest.split(" ")[0])
+    );
+  })
+);
+
+  const toggleSave = (place) => {
+    const isSaved = savedPlaces.some((p) => p.id === place.id);
+
+    let updatedPlaces;
+
+    if (isSaved) {
+      updatedPlaces = savedPlaces.filter((p) => p.id !== place.id);
+    } else {
+      updatedPlaces = [...savedPlaces, place];
+    }
+
+    setSavedPlaces(updatedPlaces);
+    localStorage.setItem("savedPlaces", JSON.stringify(updatedPlaces));
+  };
 
   const Card = ({ item }) => (
     <div
       onClick={() => setSelected(item)}
-      className="min-w-[200px] bg-white/90 rounded-2xl p-3 cursor-pointer 
-      hover:scale-110 transition duration-300 shadow-lg"
+      className="home-card"
     >
       <img
         src={item.image}
-        className="w-full h-32 object-cover rounded-xl"
+        className="home-card-image"
         alt={item.name}
       />
 
-      <h3 className="text-sm mt-2 font-semibold">{item.name}</h3>
-      <p className="text-xs text-gray-500">{item.location}</p>
+      <div className="home-card-content">
+        <h3>{item.name}</h3>
+        <p>{item.location}</p>
 
-      <div className="flex items-center gap-1 text-xs mt-1 text-yellow-500">
-        <Star size={12} />
-        {item.rating}
+        <div className="home-rating">
+          <Star size={14} />
+          {item.rating}
+        </div>
       </div>
     </div>
   );
 
-  const Section = ({ title, items }) => (
-    <div className="mb-10">
-      <h2 className="text-white text-xl font-bold mb-3">{title}</h2>
+  const Section = ({ title, items }) => {
+    const scrollRef = useRef(null);
 
-      <div className="flex gap-4 overflow-x-auto pb-2">
-        {items.map((item) => (
-          <Card key={item.id} item={item} />
-        ))}
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+
+    const checkScroll = () => {
+      const el = scrollRef.current;
+      if (!el) return;
+
+      setCanScrollLeft(el.scrollLeft > 0);
+      setCanScrollRight(
+        el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+      );
+    };
+
+    const scroll = (direction) => {
+      const container = scrollRef.current;
+      if (!container) return;
+
+      const amount = 300;
+
+      container.scrollBy({
+        left: direction === "left" ? -amount : amount,
+        behavior: "smooth",
+      });
+
+      setTimeout(checkScroll, 200);
+    };
+
+    useEffect(() => {
+      checkScroll();
+    }, [items]);
+
+    return (
+      <div className="home-section">
+        <div className="home-section-header">
+          <h2>{title}</h2>
+        </div>
+
+        <div className="home-scroll-row">
+          <div className="home-arrow-space">
+            {canScrollLeft && (
+              <button
+                onClick={() => scroll("left")}
+                className="home-arrow-btn"
+              >
+                ❮
+              </button>
+            )}
+          </div>
+
+          <div
+            ref={scrollRef}
+            onScroll={checkScroll}
+            className="home-cards-scroll no-scrollbar"
+          >
+            {items.map((item) => (
+              <Card key={item.id} item={item} />
+            ))}
+          </div>
+
+          <div className="home-arrow-space">
+            {canScrollRight && (
+              <button
+                onClick={() => scroll("right")}
+                className="home-arrow-btn"
+              >
+                ❯
+              </button>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-700 via-blue-900 to-pink-700 p-6">
+    <div className="home-page-bg">
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
 
-      {/* HEADER */}
-      <div className="flex justify-between items-center text-white mb-8">
-        <div className="flex items-center gap-2">
-          <Compass />
-          <h1 className="text-xl font-bold">KASHTA</h1>
-        </div>
 
-        <div className="flex gap-6 text-sm">
-          <span className="cursor-pointer hover:underline">Sign in</span>
-          <span className="cursor-pointer hover:underline">Sign out</span>
-        </div>
-      </div>
+      <Navbar />
 
-      {/* ICONS */}
-      <div className="flex justify-center gap-10 mb-10">
-
-        <div
-          onClick={() => navigate("/activities")}
-          className="bg-white/90 p-4 rounded-2xl shadow-xl flex flex-col items-center cursor-pointer"
-        >
-          <Activity />
-          <span className="text-xs mt-1">Activities</span>
-        </div>
-
-        <div
-          onClick={() => navigate("/meetup")}
-          className="bg-white/90 p-4 rounded-2xl shadow-xl flex flex-col items-center cursor-pointer"
-        >
-          <Users />
-          <span className="text-xs mt-1">Meetup</span>
-        </div>
-
-        <div
-          onClick={() => navigate("/profile")}
-          className="bg-white/90 p-4 rounded-2xl shadow-xl flex flex-col items-center cursor-pointer"
-        >
-          <User />
-          <span className="text-xs mt-1">Profile</span>
-        </div>
-
-      </div>
-
-      {/* SEARCH */}
-      <div className="flex justify-center mb-10">
-        <div className="bg-white rounded-full px-6 py-4 flex items-center w-full max-w-2xl shadow-xl">
-          <Search />
+      <div className="home-search-wrapper">
+        <div className="home-search-box">
+          <Search className="home-search-icon" />
           <input
             placeholder="Search..."
-            className="ml-3 w-full outline-none text-lg"
+            className="home-search-input"
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
+      {recommendedPlaces.length > 0 && (
+        <Section
+         title="Recommended For You"
+         items={recommendedPlaces.filter((p) => {
+           const term = search.toLowerCase();
+           return `${p.name} ${p.location} ${p.category}`
+             .toLowerCase()
+             .includes(term);
+         })}
+       />
+      )}
 
-      {/* SECTIONS (🔥 ديناميكي) */}
       {categories.map((cat) => (
         <Section
           key={cat}
           title={cat}
-          items={placesData
-            .filter(p => p.category === cat)
-            .filter(p =>
-              p.name.toLowerCase().includes(search.toLowerCase())
-            )}
+          items={placesData 
+            .filter((p) => p.category === cat)
+            .filter((p) => {
+              const term = search.toLowerCase();
+             return `${p.name} ${p.location} ${p.category}`
+             .toLowerCase()
+             .includes(term);
+           })}
         />
       ))}
 
-      {/* POPUP */}
       {selected && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-white w-[90%] max-w-2xl rounded-2xl p-6 relative">
-
+        <div className="home-popup-overlay">
+          <div className="home-popup-box">
             <button
               onClick={() => setSelected(null)}
-              className="absolute top-3 right-3"
+              className="home-popup-close"
             >
               <X />
             </button>
 
-            <h2 className="text-2xl font-bold mb-4">{selected.name}</h2>
+            <h2 className="home-popup-title">{selected.name}</h2>
 
-            <p className="text-gray-700 mb-4">{selected.description}</p>
+            <div className="home-popup-images">
+              {(selected.images?.length ? selected.images : [selected.image]).map((img, i) => (
+                <img
+                  key={i}
+                  src={img}
+                  alt={selected.name}
+                  className="home-popup-image"
+                />
+              ))}
+            </div>
 
-            <button className="w-full bg-purple-600 text-white py-3 rounded-xl">
-              Create a Meetup
-            </button>
+            <div className="home-popup-info">
+              <div className="home-popup-row">
+                <span>📍</span>
+                <span>{selected.location}</span>
+              </div>
 
+              <div className="home-popup-row">
+                <Star size={16} />
+                <span>{selected.rating} / 5</span>
+              </div>
+
+              <div>
+                <p className="home-popup-about-title">About</p>
+                <p>{selected.description}</p>
+              </div>
+            </div>
+
+            <div className="home-popup-actions">
+              <button
+                onClick={() => toggleSave(selected)}
+                className={`home-save-btn ${
+                  savedPlaces.some((p) => p.id === selected.id)
+                    ? "saved"
+                    : ""
+                }`}
+              >
+                <Bookmark size={18} />
+              </button>
+
+              <button
+                onClick={() => {
+                  navigate("/meetups", {
+                    state: {
+                      openCreate: true,
+                      place: selected
+                    }
+                  });
+                }}
+                className="home-create-btn"
+              >
+                <Users size={18} />
+                Create a Meetup
+              </button>
+            </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

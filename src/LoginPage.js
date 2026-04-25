@@ -4,11 +4,41 @@ import { useNavigate } from "react-router-dom";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
   const navigate = useNavigate();
 
   const handleLogin = (e) => {
     e.preventDefault();
-    navigate("/home");
+
+    // ✅ validation
+    if (!email || !password) {
+      setError("Please fill all fields");
+      return;
+    }
+
+    if (!email.includes("@")) {
+      setError("Invalid email format");
+      return;
+    }
+
+    // ✅ جلب المستخدم من localStorage
+    const storedUser = JSON.parse(localStorage.getItem("user"));
+
+    if (
+      storedUser &&
+      email === storedUser.email &&
+      password === storedUser.password
+    ) {
+      setError("");
+
+      //  الإضافة الوحيدة المهمة (الحماية)
+      localStorage.setItem("user", JSON.stringify(storedUser));
+
+      navigate("/home");
+    } else {
+      setError("Incorrect email or password");
+    }
   };
 
   const handleSignup = () => {
@@ -22,8 +52,7 @@ export default function LoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background:
-          "radial-gradient(circle at 20% 20%, #9333ea, #020617 60%), radial-gradient(circle at 80% 80%, #f97316, transparent)",
+        background: "linear-gradient(135deg, #130f53, #1e1b4b, #020617)",
       }}
     >
       <div style={{ width: "100%", maxWidth: "400px" }}>
@@ -34,7 +63,7 @@ export default function LoginPage() {
             style={{
               fontSize: "40px",
               fontWeight: "bold",
-              background: "linear-gradient(to right, #c084fc, #f472b6)",
+              background: "linear-gradient(to right, #a855f7, #ff8a00)",
               WebkitBackgroundClip: "text",
               color: "transparent",
             }}
@@ -51,9 +80,9 @@ export default function LoginPage() {
           style={{
             padding: "30px",
             borderRadius: "20px",
-            background: "rgba(15, 23, 42, 0.85)",
+            background: "rgba(78, 33, 155, 0.35)",
             backdropFilter: "blur(20px)",
-            border: "1px solid rgba(255,255,255,0.2)",
+            border: "1px solid rgba(255,255,255,0.1)",
             boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
           }}
         >
@@ -76,8 +105,8 @@ export default function LoginPage() {
                 padding: "12px",
                 marginTop: "15px",
                 borderRadius: "10px",
-                background: "#020617",
-                border: "1px solid #475569",
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.15)",
                 color: "white",
               }}
             />
@@ -92,42 +121,67 @@ export default function LoginPage() {
                 padding: "12px",
                 marginTop: "10px",
                 borderRadius: "10px",
-                background: "#020617",
-                border: "1px solid #475569",
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.15)",
                 color: "white",
               }}
             />
 
+            {error && (
+              <p style={{ color: "#f87171", marginTop: "10px", fontSize: "14px" }}>
+                {error}
+              </p>
+            )}
+
             <button
               type="submit"
-              style={{
-                width: "100%",
-                padding: "12px",
-                marginTop: "15px",
-                borderRadius: "10px",
-                border: "none",
-                background: "linear-gradient(to right, #7c3aed, #ec4899)",
-                color: "white",
-                fontWeight: "bold",
-                cursor: "pointer",
-                boxShadow: "0 0 15px rgba(168,85,247,0.7)",
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.05)";
+                e.currentTarget.style.boxShadow = "0 0 25px rgba(230,96,0,0.8)";
               }}
-            >
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.boxShadow = "0 6px 15px rgba(0,0,0,0.3)";
+              }}
+             style={{
+               width: "100%",
+               padding: "12px",
+               marginTop: "15px",
+               borderRadius: "10px",
+               border: "none",
+               background: "linear-gradient(to right, #4e219b, #e66000)",
+               color: "white",
+               fontWeight: "bold",
+               cursor: "pointer",
+               transition: "0.25s ease",
+               boxShadow: "0 6px 15px rgba(0,0,0,0.3)",
+             }}
+           >
               Sign In
-            </button>
+           </button>
           </form>
 
           <p
-            style={{
-              textAlign: "center",
-              marginTop: "15px",
-              color: "#c084fc",
-              cursor: "pointer",
-            }}
             onClick={handleSignup}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.08)";
+              e.currentTarget.style.color = "#ffa94d";
+            }}
+           onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+             e.currentTarget.style.color = "#ff8a00";
+           }}
+           style={{
+             textAlign: "center",
+             marginTop: "15px",
+             color: "#ff8a00",
+             cursor: "pointer",
+             transition: "0.25s ease",
+             fontWeight: "500",
+            }}
           >
-            Create account
-          </p>
+           Create account
+        </p>
         </div>
       </div>
     </div>

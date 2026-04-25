@@ -1,0 +1,538 @@
+/* =========================
+   🌌 BACKGROUND
+========================= */
+.meetup-page-bg {
+  background: linear-gradient(135deg, #130f53);
+  color: white;
+  padding-bottom: 50px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* =========================
+   🧭 NAVIGATION
+========================= */
+.nav-center {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  margin: 15px 0;
+}
+
+.nav-item {
+  text-decoration: none;
+  color: white;
+  font-weight: bold;
+  opacity: 0.6;
+}
+
+.nav-item.active {
+  opacity: 1;
+  border-bottom: 3px solid #ff6b00;
+  padding-bottom: 5px;
+}
+
+/* =========================
+   🔍 SEARCH
+========================= */
+.search-container-center {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+  padding: 0 20px;
+}
+
+.search-container-center input {
+  width: 500px !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+  padding: 12px 20px !important;
+}
+
+.search-wrapper-custom {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+}
+
+.search-glass-icon {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  opacity: 0.6;
+}
+
+.main-search-input {
+  width: 100%;
+  padding: 15px 15px 15px 45px;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  outline: none;
+  backdrop-filter: blur(10px);
+}
+
+.main-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* =========================
+   🧾 TITLES
+========================= */
+.section-title-center {
+  text-align: center;
+  margin: 40px 0;
+  letter-spacing: 2px;
+}
+
+/* =========================
+   🧩 GRID & CARDS
+========================= */
+.meetup-grid-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 25px;
+  padding: 0 50px;
+}
+
+.meetup-card-custom {
+  background: rgba(78, 33, 155, 0.45);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  overflow: hidden;
+  text-align: left;
+  transition: 0.25s ease;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.22);
+}
+
+.meetup-card-custom:hover {
+  transform: translateY(-4px);
+}
+
+.card-img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+
+.card-content {
+  padding: 20px;
+}
+
+.card-content h3 {
+  margin-bottom: 8px;
+  font-size: 1.2rem;
+}
+
+.card-date {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-bottom: 12px;
+}
+
+.card-attendees {
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+/* =========================
+   ⚙️ HEADER
+========================= */
+.header-top-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 20px 40px;
+}
+
+.filter-by-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid #e66000;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: 0.25s ease;
+}
+
+.filter-by-btn:hover {
+  box-shadow: 0 0 18px rgba(230, 96, 0, 0.35);
+}
+
+/* =========================
+   🪟 POPUP
+========================= */
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.popup-content {
+  background: linear-gradient(180deg, #6b46c1, #4e219b);
+  color: white;
+  width: 90%;
+  max-width: 440px;
+  border-radius: 32px;
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.36);
+}
+
+.popup-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.popup-body {
+  padding: 25px;
+}
+
+.popup-body small {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.popup-body p {
+  color: white;
+  margin: 4px 0 0;
+}
+
+.popup-info-row {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.info-icon {
+  background: #f3f0ff;
+  color: #7c3aed;
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.popup-message-box textarea {
+  width: 100%;
+  height: 80px;
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  padding: 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.popup-message-box textarea::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.popup-action-btns {
+  display: flex;
+  gap: 12px;
+  margin-top: 25px;
+}
+
+/* =========================
+   🧠 CREATE MODAL
+========================= */
+.create-popup-content {
+  width: 92%;
+  max-width: 520px;
+  border-radius: 28px;
+  padding: 28px;
+  background: rgba(78, 33, 155, 0.92);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+  color: white;
+  animation: slideUp 0.25s ease-out;
+}
+
+.create-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.create-popup-header h2 {
+  font-size: 1.3rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: white;
+  margin: 0;
+}
+
+.close-x-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.close-x-btn:hover {
+  color: white;
+}
+
+.create-popup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-group label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.input-group input,
+.input-group textarea {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  outline: none;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+.input-group input::placeholder,
+.input-group textarea::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.input-group input:focus,
+.input-group textarea:focus {
+  border-color: rgba(230, 96, 0, 0.8);
+  box-shadow: 0 0 0 3px rgba(230, 96, 0, 0.18);
+}
+
+.input-group textarea {
+  min-height: 90px;
+  resize: none;
+}
+
+.date-time-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.create-action-wrapper {
+  margin-top: 6px;
+}
+
+.btn-final-create {
+  width: 100%;
+  border: none;
+  border-radius: 16px;
+  padding: 14px 20px;
+  font-weight: 800;
+  font-size: 1rem;
+  color: white;
+  cursor: pointer;
+  background: linear-gradient(90deg, #e66000, #ff8a00);
+  box-shadow: 0 10px 25px rgba(230, 96, 0, 0.28);
+  transition: 0.2s ease;
+}
+
+.btn-final-create:hover {
+  transform: translateY(-1px);
+  opacity: 0.96;
+}
+
+/* =========================
+   🔘 POPUP ACTION BUTTONS
+========================= */
+.btn-cancel-popup {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.btn-cancel-popup:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-send-request {
+  flex: 2;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(90deg, #e66000, #ff8a00);
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s ease;
+  box-shadow: 0 10px 22px rgba(230, 96, 0, 0.28);
+}
+
+.btn-send-request:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+/* =========================
+   👥 PARTICIPANTS
+========================= */
+.participants-block {
+  position: relative;
+  width: 100%;
+}
+
+.participants-avatars {
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.avatar-circle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, #7c3aed, #ff6b00);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.9rem;
+  margin-right: -8px;
+  border: 2px solid white;
+}
+
+.avatar-circle.small {
+  width: 28px;
+  height: 28px;
+  font-size: 0.75rem;
+  margin-right: 8px;
+}
+
+.avatar-more {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  margin-left: 6px;
+  font-weight: 700;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.participants-dropdown {
+  position: absolute;
+  top: 58px;
+  left: 0;
+  min-width: 220px;
+  max-height: 180px;
+  overflow-y: auto;
+  background: rgba(40, 20, 100, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+  z-index: 20;
+  animation: participantsFade 0.22s ease;
+  backdrop-filter: blur(10px);
+}
+
+.participant-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px;
+  color: white;
+}
+
+.participant-row:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.no-participants {
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+@keyframes participantsFade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.participants-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.participants-dropdown::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 10px;
+}
+
+/* =========================
+   ➕ FLOATING BUTTON
+========================= */
+.floating-create-btn {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, #e66000, #ff8a00);
+  color: white;
+  border: none;
+  padding: 18px 40px;
+  font-size: 18px;
+  border-radius: 50px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(230, 96, 0, 0.4);
+  z-index: 999;
+  transition: 0.25s ease;
+}
+
+.floating-create-btn:hover {
+  transform: translateX(-50%) scale(1.05);
+  box-shadow: 0 0 25px rgba(255, 138, 0, 0.9);
+}

@@ -1,18 +1,50 @@
 import { useNavigate, Link } from "react-router-dom";
+import { useState } from "react";
 
 export default function SignupPage() {
   const navigate = useNavigate();
 
+  const [error, setError] = useState("");
+
   const handleSignup = (e) => {
     e.preventDefault();
 
+    const name = e.target.name.value;
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+    const confirmPassword = e.target.confirmPassword.value;
+
+    if (!name || !email || !password || !confirmPassword) {
+      setError("Please fill all fields");
+      return;
+    }
+
+    if (!email.includes("@")) {
+      setError("Invalid email format");
+      return;
+    }
+
+    if (password.length < 4) {
+      setError("Password must be at least 4 characters");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
     const user = {
-      email: e.target.email.value,
-      password: e.target.password.value,
+      name,
+      email,
+      password
     };
 
     localStorage.setItem("user", JSON.stringify(user));
 
+    localStorage.removeItem("interests");
+    localStorage.removeItem("hasInterests");
+    setError("");
     navigate("/interests");
   };
 
@@ -22,8 +54,9 @@ export default function SignupPage() {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      background:
-        "radial-gradient(circle at 20% 20%, #9333ea, #020617 60%), radial-gradient(circle at 80% 80%, #f97316, transparent)"
+
+      
+      background: "linear-gradient(135deg, #130f53, #1e1b4b, #020617)"
     }}>
       
       <div style={{ width: "100%", maxWidth: "400px" }}>
@@ -34,14 +67,15 @@ export default function SignupPage() {
             <h1 style={{
               fontSize: "40px",
               fontWeight: "bold",
-              background: "linear-gradient(to right, #c084fc, #f472b6)",
+              background: "linear-gradient(to right, #a855f7, #ff8a00)",
               WebkitBackgroundClip: "text",
-              color: "transparent"
+              WebkitTextFillColor: "transparent"
             }}>
               Kashta
             </h1>
           </Link>
-          <p style={{ color: "#e2e8f0" }}>
+
+          <p style={{ color: "rgba(255,255,255,0.7)" }}>
             Discover amazing places, meet new people
           </p>
         </div>
@@ -50,10 +84,10 @@ export default function SignupPage() {
         <div style={{
           padding: "30px",
           borderRadius: "20px",
-          background: "rgba(15, 23, 42, 0.85)",
+          background: "rgba(78, 33, 155, 0.35)",
           backdropFilter: "blur(20px)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
+          border: "1px solid rgba(255,255,255,0.1)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.4)"
         }}>
           
           <h2 style={{
@@ -65,20 +99,19 @@ export default function SignupPage() {
           </h2>
 
           <p style={{
-            color: "#e2e8f0",
+            color: "rgba(255,255,255,0.7)",
             textAlign: "center",
             marginBottom: "20px"
           }}>
             Start exploring amazing places
           </p>
 
-          {/* Form */}
           <form onSubmit={handleSignup}>
             
-            {/* Name */}
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ color: "#ddd" }}>Full Name</label>
+              <label style={{ color: "rgba(255,255,255,0.8)" }}>Full Name</label>
               <input
+                name="name"
                 type="text"
                 placeholder="John Doe"
                 style={{
@@ -86,17 +119,17 @@ export default function SignupPage() {
                   padding: "12px",
                   marginTop: "5px",
                   borderRadius: "10px",
-                  background: "#020617",
-                  border: "1px solid #475569",
+
+                  // 🔥 inputs موحدة
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.15)",
                   color: "white"
                 }}
-                required
               />
             </div>
 
-            {/* Email */}
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ color: "#ddd" }}>Email</label>
+              <label style={{ color: "rgba(255,255,255,0.8)" }}>Email</label>
               <input
                 name="email"
                 type="email"
@@ -106,17 +139,15 @@ export default function SignupPage() {
                   padding: "12px",
                   marginTop: "5px",
                   borderRadius: "10px",
-                  background: "#020617",
-                  border: "1px solid #475569",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.15)",
                   color: "white"
                 }}
-                required
               />
             </div>
 
-            {/* Password */}
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ color: "#ddd" }}>Password</label>
+              <label style={{ color: "rgba(255,255,255,0.8)" }}>Password</label>
               <input
                 name="password"
                 type="password"
@@ -126,15 +157,37 @@ export default function SignupPage() {
                   padding: "12px",
                   marginTop: "5px",
                   borderRadius: "10px",
-                  background: "#020617",
-                  border: "1px solid #475569",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.15)",
                   color: "white"
                 }}
-                required
               />
             </div>
 
-            {/* Button */}
+            <div style={{ marginBottom: "15px" }}>
+              <label style={{ color: "rgba(255,255,255,0.8)" }}>Confirm Password</label>
+              <input
+                name="confirmPassword"
+                type="password"
+                placeholder="Repeat password"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  marginTop: "5px",
+                  borderRadius: "10px",
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  color: "white"
+                }}
+              />
+            </div>
+
+            {error && (
+              <p style={{ color: "#f87171", marginBottom: "10px", fontSize: "14px" }}>
+                {error}
+              </p>
+            )}
+
             <button
               type="submit"
               style={{
@@ -142,63 +195,53 @@ export default function SignupPage() {
                 padding: "12px",
                 borderRadius: "10px",
                 border: "none",
-                background: "linear-gradient(to right, #7c3aed, #ec4899)",
+
+                
+                background: "linear-gradient(to right, #4e219b, #e66000)",
                 color: "white",
                 fontWeight: "bold",
                 cursor: "pointer",
-                transition: "0.3s"
+                boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+                transition: "0.25s"
               }}
-              onMouseOver={(e) => (e.target.style.opacity = "0.8")}
-              onMouseOut={(e) => (e.target.style.opacity = "1")}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.03)";
+                e.currentTarget.style.boxShadow = "0 0 25px rgba(230,96,0,0.8)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.boxShadow = "0 8px 20px rgba(230,96,0,0.4)";
+              }}
             >
               Create Account
             </button>
           </form>
 
-          {/* Divider */}
-          <div style={{
-            textAlign: "center",
-            margin: "20px 0",
-            color: "#aaa"
-          }}>
-            OR
-          </div>
-
-          {/* Google */}
-          <button style={{
-            width: "100%",
-            padding: "12px",
-            borderRadius: "10px",
-            border: "1px solid #555",
-            background: "rgba(255,255,255,0.1)",
-            color: "white",
-            cursor: "pointer"
-          }}>
-            Continue with Google
-          </button>
-
-          {/* Login */}
           <p style={{
             textAlign: "center",
             marginTop: "20px",
-            color: "#aaa"
+            color: "rgba(255,255,255,0.6)"
           }}>
             Already have an account?{" "}
-            <Link to="/" style={{ color: "#c084fc" }}>
+            <Link
+              to="/"
+              style={{
+                color: "#ff8a00",
+                textDecoration: "none",
+                transition: "0.2s"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.08)";
+                e.currentTarget.style.display = "inline-block";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
               Sign in
             </Link>
           </p>
         </div>
-
-        {/* Footer */}
-        <p style={{
-          textAlign: "center",
-          color: "#777",
-          fontSize: "12px",
-          marginTop: "20px"
-        }}>
-          Join thousands discovering the best places in town
-        </p>
       </div>
     </div>
   );
