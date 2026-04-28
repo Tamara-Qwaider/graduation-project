@@ -8,6 +8,7 @@ import Profile from "./Profile";
 import MeetupPage from "./MeetupPage";
 import ProtectedRoute from "./ProtectedRoute";
 import ActivityPage from "./ActivityPage";
+import AdminPage from "./AdminPage";
 
 function App() {
   return (
@@ -56,6 +57,15 @@ function App() {
         element={
           <ProtectedRoute>
             <ActivityPage />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminPage />
           </ProtectedRoute>
         }
       />

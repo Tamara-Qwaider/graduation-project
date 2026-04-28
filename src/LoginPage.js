@@ -22,7 +22,16 @@ export default function LoginPage() {
       return;
     }
 
-    // ✅ جلب المستخدم من localStorage
+    // ✅ منطق تسجيل دخول الأدمن
+    if (email === "admin@kashta.com" && password === "admin123") {
+      setError("");
+      // تخزين بيانات الأدمن لتمكين الـ ProtectedRoute من التعرف عليه
+      localStorage.setItem("user", JSON.stringify({ email: email, role: "admin" }));
+      navigate("/admin");
+      return;
+    }
+
+    // ✅ جلب المستخدم العادي من localStorage
     const storedUser = JSON.parse(localStorage.getItem("user"));
 
     if (
@@ -68,7 +77,7 @@ export default function LoginPage() {
               color: "transparent",
             }}
           >
-            Kashta
+            VIBE
           </h1>
           <p style={{ color: "#e2e8f0" }}>
             Discover amazing places, meet new people
@@ -143,22 +152,22 @@ export default function LoginPage() {
                 e.currentTarget.style.transform = "scale(1)";
                 e.currentTarget.style.boxShadow = "0 6px 15px rgba(0,0,0,0.3)";
               }}
-             style={{
-               width: "100%",
-               padding: "12px",
-               marginTop: "15px",
-               borderRadius: "10px",
-               border: "none",
-               background: "linear-gradient(to right, #4e219b, #e66000)",
-               color: "white",
-               fontWeight: "bold",
-               cursor: "pointer",
-               transition: "0.25s ease",
-               boxShadow: "0 6px 15px rgba(0,0,0,0.3)",
-             }}
-           >
+              style={{
+                width: "100%",
+                padding: "12px",
+                marginTop: "15px",
+                borderRadius: "10px",
+                border: "none",
+                background: "linear-gradient(to right, #4e219b, #e66000)",
+                color: "white",
+                fontWeight: "bold",
+                cursor: "pointer",
+                transition: "0.25s ease",
+                boxShadow: "0 6px 15px rgba(0,0,0,0.3)",
+              }}
+            >
               Sign In
-           </button>
+            </button>
           </form>
 
           <p
@@ -167,21 +176,21 @@ export default function LoginPage() {
               e.currentTarget.style.transform = "scale(1.08)";
               e.currentTarget.style.color = "#ffa94d";
             }}
-           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "scale(1)";
-             e.currentTarget.style.color = "#ff8a00";
-           }}
-           style={{
-             textAlign: "center",
-             marginTop: "15px",
-             color: "#ff8a00",
-             cursor: "pointer",
-             transition: "0.25s ease",
-             fontWeight: "500",
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+              e.currentTarget.style.color = "#ff8a00";
+            }}
+            style={{
+              textAlign: "center",
+              marginTop: "15px",
+              color: "#ff8a00",
+              cursor: "pointer",
+              transition: "0.25s ease",
+              fontWeight: "500",
             }}
           >
-           Create account
-        </p>
+            Create account
+          </p>
         </div>
       </div>
     </div>
