@@ -1,6 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Users, Search, Star, X, Bookmark } from "lucide-react";
+import React, { useState, useEffect } from "react";
 import Navbar from "./Navbar";
 import "./ActivityPage.css";
 

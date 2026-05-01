@@ -4,132 +4,6 @@ import { Bookmark, Users, Search, Star, X } from "lucide-react";
 import Navbar from "./Navbar";
 import "./HomePage.css";
 
-const placesData = [
-  {
-    id: 1,
-    name: "Petra",
-    category: "Suggestions",
-    image: "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1",
-    location: "Jordan",
-    rating: 4.9,
-    description: "Ancient city carved in rose-red rock.",
-    images: [
-      "https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1",
-      "https://images.unsplash.com/photo-1580706486641-ebec9f673d36",
-      "https://images.unsplash.com/photo-1662747975053-ee44de7015a0"
-    ]
-  },
-  {
-    id: 2,
-    name: "Dead Sea",
-    category: "Suggestions",
-    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
-    location: "Jordan",
-    rating: 4.8,
-    description: "Lowest point on Earth.",
-    images: ["https://images.unsplash.com/photo-1506744038136-46273834b3fb"]
-  },
-  {
-    id: 3,
-    name: "Wadi Rum",
-    category: "Suggestions",
-    image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee",
-    location: "Jordan",
-    rating: 4.7,
-    description: "Beautiful desert adventure.",
-    images: ["https://images.unsplash.com/photo-1500530855697-b586d89ba3ee"]
-  },
-  {
-    id: 8,
-    name: "Jerash",
-    category: "Suggestions",
-    image: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c",
-    location: "Jordan",
-    rating: 4.8,
-    description: "Ancient Roman ruins and columns.",
-    images: ["https://images.unsplash.com/photo-1512453979798-5ea266f8880c"]
-  },
-  {
-    id: 9,
-    name: "Ajloun Castle",
-    category: "Cafes",
-    image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee",
-    location: "Jordan",
-    rating: 4.7,
-    description: "Historic Islamic castle with scenic views.",
-    images: ["https://images.unsplash.com/photo-1500530855697-b586d89ba3ee"]
-  },
-  {
-    id: 10,
-    name: "Dana Reserve",
-    category: "Suggestions",
-    image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
-    location: "Jordan",
-    rating: 4.9,
-    description: "Nature reserve with breathtaking landscapes.",
-    images: ["https://images.unsplash.com/photo-1506744038136-46273834b3fb"]
-  },
-  {
-    id: 11,
-    name: "Umm Qais",
-    category: "Suggestions",
-    image: "https://images.unsplash.com/photo-1493246507139-91e8fad9978e",
-    location: "Jordan",
-    rating: 4.6,
-    description: "Ancient hilltop city overlooking the valley.",
-    images: ["https://images.unsplash.com/photo-1493246507139-91e8fad9978e"]
-  },
-  {
-    id: 12,
-    name: "Aqaba Beach",
-    category: "Cafes",
-    image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e",
-    location: "Jordan",
-    rating: 4.8,
-    description: "Relaxing beach with clear blue water.",
-    images: ["https://images.unsplash.com/photo-1507525428034-b723cf961d3e"]
-  },
-  {
-    id: 4,
-    name: "Cafe Milano",
-    category: "Cafes",
-    image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93",
-    location: "Amman",
-    rating: 4.5,
-    description: "Cozy cafe.",
-    images: []
-  },
-  {
-    id: 5,
-    name: "Street Coffee",
-    category: "Cafes",
-    image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24",
-    location: "Amman",
-    rating: 4.6,
-    description: "Fresh coffee.",
-    images: []
-  },
-  {
-    id: 6,
-    name: "Levant Restaurant",
-    category: "Restaurants",
-    image: "https://images.unsplash.com/photo-1544025162-d76694265947",
-    location: "Amman",
-    rating: 4.8,
-    description: "Traditional food.",
-    images: []
-  },
-  {
-    id: 7,
-    name: "Roman Amphitheater",
-    category: "Activities",
-    image: "https://images.unsplash.com/photo-1581783898377-1c85bf937427",
-    location: "Amman",
-    rating: 4.7,
-    description: "Historic Roman site.",
-    images: []
-  }
-];
 
 export default function Home() {
   const [selected, setSelected] = useState(null);
@@ -137,7 +11,20 @@ export default function Home() {
   const [savedPlaces, setSavedPlaces] = useState(() => {
     return JSON.parse(localStorage.getItem("savedPlaces")) || [];
   });
+  const [placesData, setPlacesData] = useState([]);
+  useEffect(() => {
+  const fetchPlaces = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/places");
+      const data = await res.json();
+      setPlacesData(data);
+    } catch (err) {
+      console.log("Error fetching places", err);
+    }
+  };
 
+  fetchPlaces();
+}, []);
   const navigate = useNavigate();
 
   const categories = [...new Set(placesData.map((p) => p.category))];

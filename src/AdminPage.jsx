@@ -75,10 +75,37 @@ export default function AdminPage() {
     setIsEditMeetupOpen(false);
   };
 
-  const handleAddPlace = (newPlace) => {
-    setPlaces([...places, { id: Date.now(), ...newPlace }]);
+  const handleAddPlace = async (newPlace) => {
+  try {
+    const res = await fetch("http://localhost:5000/api/places", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: newPlace.name,
+        category: newPlace.category || "Suggestions",
+        image: newPlace.img,
+        location: newPlace.loc,
+        rating: Number(newPlace.rate),
+        description: newPlace.desc,
+        images: newPlace.img ? [newPlace.img] : [],
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.message || "Failed to add place");
+      return;
+    }
+
+    setPlaces([...places, data.place]);
     setIsAddPlaceOpen(false);
-  };
+  } catch (err) {
+    alert("Server error");
+  }
+};
 
   const handleUpdatePlace = (updatedPlace) => {
     setPlaces(places.map(p => p.id === updatedPlace.id ? updatedPlace : p));

@@ -8,7 +8,7 @@ export default function LoginPage() {
 
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e)  => {
     e.preventDefault();
 
     // ✅ validation
@@ -30,24 +30,34 @@ export default function LoginPage() {
       navigate("/admin");
       return;
     }
+  try {
+  const res = await fetch("http://localhost:5000/api/auth/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+  });
 
-    // ✅ جلب المستخدم العادي من localStorage
-    const storedUser = JSON.parse(localStorage.getItem("user"));
+  const data = await res.json();
 
-    if (
-      storedUser &&
-      email === storedUser.email &&
-      password === storedUser.password
-    ) {
-      setError("");
+  if (!res.ok) {
+    setError(data.message || "Login failed");
+    return;
+  }
 
-      //  الإضافة الوحيدة المهمة (الحماية)
-      localStorage.setItem("user", JSON.stringify(storedUser));
+  // 🔥 تخزين البيانات من backend
+  localStorage.setItem("token", data.token);
+  localStorage.setItem("user", JSON.stringify(data.user));
 
-      navigate("/home");
-    } else {
-      setError("Incorrect email or password");
-    }
+  setError("");
+  navigate("/home");
+} catch (err) {
+  setError("Server error");
+}
   };
 
   const handleSignup = () => {

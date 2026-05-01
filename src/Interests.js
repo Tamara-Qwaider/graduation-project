@@ -28,20 +28,45 @@ function Interests() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave =async () => {
     if (selected.length === 0) {
       alert("Please select at least one interest!");
       return;
     }
 
-    localStorage.setItem("interests", JSON.stringify(selected));
-    localStorage.setItem("hasInterests", "true");
+  try {
+  const user = JSON.parse(localStorage.getItem("user"));
 
-    if (location.state?.fromProfile) {
-      navigate("/profile");
-    } else {
-      navigate("/home");
-    }
+  const res = await fetch("http://localhost:5000/api/auth/interests", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      userId: user.id,
+      interests: selected,
+    }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    alert(data.message || "Failed to save interests");
+    return;
+  }
+
+  localStorage.setItem("interests", JSON.stringify(selected));
+  localStorage.setItem("hasInterests", "true");
+  localStorage.setItem("user", JSON.stringify(data.user));
+
+  if (location.state?.fromProfile) {
+    navigate("/profile");
+  } else {
+    navigate("/home");
+  }
+} catch (err) {
+  alert("Server error");
+}
   };
 
   return (

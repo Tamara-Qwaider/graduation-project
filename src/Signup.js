@@ -6,7 +6,7 @@ export default function SignupPage() {
 
   const [error, setError] = useState("");
 
-  const handleSignup = (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
 
     const name = e.target.name.value;
@@ -34,18 +34,38 @@ export default function SignupPage() {
       return;
     }
 
-    const user = {
+    try {
+  const res = await fetch("http://localhost:5000/api/auth/signup", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
       name,
       email,
-      password
-    };
+      password,
+      interests: [],
+    }),
+  });
 
-    localStorage.setItem("user", JSON.stringify(user));
+  const data = await res.json();
 
-    localStorage.removeItem("interests");
-    localStorage.removeItem("hasInterests");
-    setError("");
-    navigate("/interests");
+  if (!res.ok) {
+    setError(data.message || "Signup failed");
+    return;
+  }
+
+  localStorage.setItem("token", data.token);
+  localStorage.setItem("user", JSON.stringify(data.user));
+
+  localStorage.removeItem("interests");
+  localStorage.removeItem("hasInterests");
+
+  setError("");
+  navigate("/interests");
+} catch (err) {
+  setError("Server error");
+}
   };
 
   return (
