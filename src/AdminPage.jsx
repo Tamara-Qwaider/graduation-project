@@ -107,10 +107,31 @@ export default function AdminPage() {
   }
 };
 
-  const handleUpdatePlace = (updatedPlace) => {
-    setPlaces(places.map(p => p.id === updatedPlace.id ? updatedPlace : p));
-    setIsEditPlaceOpen(false);
+  const handleUpdatePlace = async(updatedPlace) => {
+    try{
+      const res=await fetch(`http://localhost:5000/api/places/${updatedPlace._id}`,{
+        method:"PUT",
+        headers:{
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify(updatedPlace),
+      });
+      const data =await res.json();
+      if(!res.ok){
+        alert(data.message||"failed to update");
+        return;
+      }
+      setPlaces(
+        places.map((p)=>
+          p._id===data.place._id ? data.place: p
+        )
+      );
+      setIsEditPlaceOpen(false);
+    } catch(err){
+      alert("Server error");
+    }
   };
+   
 
   return (
     <div className="min-h-screen bg-[#060b1a] text-white font-sans overflow-x-hidden">
@@ -185,7 +206,21 @@ export default function AdminPage() {
               data={filteredPlaces} 
               onEdit={(p) => { setSelectedItem(p); setIsEditPlaceOpen(true); }}
               onAddClick={() => setIsAddPlaceOpen(true)}
-              onRemove={(id) => setPlaces(places.filter(x => x.id !== id))}
+              onRemove={async(id) =>{
+                try{
+                  const res=await fetch(`http://localhost:5000/api/places/${id}`,{
+                    method:"DELETE"
+                  });
+                  const data=await res.json();
+                  if(!res.ok){
+                    alert(data.message||"Failed to delete");
+                    return;
+                  }
+                  setPlaces(places.filter((x)=> x._id !==id));
+                }catch(err){
+                  alert("Server error");
+                }
+              }}
             />
           )}
           {activeTab === 'meetup' && (
@@ -258,7 +293,7 @@ const PlacesSection = ({ data, onEdit, onRemove, onAddClick }) => (
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
       {data.map(p => (
-        <motion.div layout key={p.id} className="bg-[#6d28d9] rounded-[2.5rem] overflow-hidden shadow-2xl">
+        <motion.div layout key={p._id||p.id} className="bg-[#6d28d9] rounded-[2.5rem] overflow-hidden shadow-2xl">
           <img src={p.img} alt="" className="h-72 w-full object-cover" />
           <div className="p-8">
             <h3 className="text-2xl font-bold mb-3">{p.name}</h3>
@@ -270,7 +305,7 @@ const PlacesSection = ({ data, onEdit, onRemove, onAddClick }) => (
             </div>
             <div className="flex gap-4">
               <button onClick={() => onEdit(p)} className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-bold uppercase tracking-widest text-xs">✏️ Edit</button>
-              <button onClick={() => onRemove(p.id)} className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-bold uppercase tracking-widest text-xs">🗑️ Remove</button>
+              <button onClick={() => onRemove(p._id||p.id)} className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-bold uppercase tracking-widest text-xs">🗑️ Remove</button>
             </div>
           </div>
         </motion.div>
