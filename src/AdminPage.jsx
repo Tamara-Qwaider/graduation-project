@@ -67,18 +67,35 @@ export default function AdminPage() {
     { id: 3, title: "Community Yoga Session", loc: "Central Park Plaza", time: "April 28, 2026 • 7:00 AM", p: 2 },
   ]);
 
-  const [users, setUsers] = useState([
-    { id: 1, name: "Sarah Johnson", email: "sarah.j@example.com", initial: "SJ" },
-    { id: 2, name: "Michael Chen", email: "michael.c@example.com", initial: "MC" },
-    { id: 3, name: "Emma Williams", email: "emma.w@example.com", initial: "EW" },
-    { id: 4, name: "David Martinez", email: "david.m@example.com", initial: "DM" },
-  ]);
+  const [users, setUsers] = useState([]);
+
+useEffect(() => {
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/users");
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message || "Failed to fetch users");
+        return;
+      }
+
+      setUsers(data);
+    } catch (err) {
+      alert("Server error");
+    }
+  };
+
+  fetchUsers();
+}, []);
   const [categories, setCategories] = useState([]);
 
   // --- منطق الفلترة ---
   const filteredPlaces = places.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredMeetups = meetups.filter(m => m.title.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredUsers = users.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredUsers = users.filter((u) =>
+  (u.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+ );
 
   // --- States للمودلز ---
   const [isEditMeetupOpen, setIsEditMeetupOpen] = useState(false);
@@ -307,7 +324,32 @@ export default function AdminPage() {
               key="users" 
               data={filteredUsers} 
               onRestrict={(u) => { setSelectedItem(u); setIsRestrictUserOpen(true); }}
-              onBlock={(id) => setUsers(users.filter(x => x.id !== id))}
+              onBlock={async (user) => {
+                try {
+                  const id = user._id || user.id;
+
+                  const res = await fetch(`http://localhost:5000/api/users/${id}/block`, {
+                    method: "PUT",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      isBlocked: !user.isBlocked,
+                    }),
+                  });
+
+                  const data = await res.json();
+
+                  if (!res.ok) {
+                    alert(data.message || "Failed to update user");
+                    return;
+                  }
+
+                  setUsers(users.map((u) => (u._id || u.id) === id ? data.user : u));
+                } catch (err) {
+                  alert("Server error");
+                }
+              }}
             />
           )}
         </AnimatePresence>
@@ -336,7 +378,44 @@ export default function AdminPage() {
       />
 
       <CreateMeetupModal isOpen={isCreateMeetupOpen} onClose={() => setIsCreateMeetupOpen(false)} onCreate={handleCreateMeetup} />
-      <RestrictUserModal isOpen={isRestrictUserOpen} onClose={() => setIsRestrictUserOpen(false)} user={selectedItem} />
+      <RestrictUserModal
+        isOpen={isRestrictUserOpen}
+        onClose={() => setIsRestrictUserOpen(false)}
+        user={selectedItem}
+        onSave={async (user, permissions) => {
+          try {
+            const id = user._id || user.id;
+
+            const res = await fetch(
+              `http://localhost:5000/api/users/${id}/permissions`,
+              {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+               },
+               body: JSON.stringify(permissions),
+             }
+            );
+
+           const data = await res.json();
+
+           if (!res.ok) {
+              alert(data.message || "Failed to update permissions");
+              return;
+            }
+
+            setUsers(
+              users.map((u) =>
+                (u._id || u.id) === id ? data.user : u
+              )
+           );
+
+           setIsRestrictUserOpen(false);
+         } catch (err) {
+           alert("Server error");
+         }
+       }}
+     />
     </div>
   );
 }
@@ -559,12 +638,17 @@ const UsersSection = ({ data, onRestrict, onBlock }) => (
     <h2 className="text-4xl font-bold mb-10 uppercase tracking-widest text-[#ff6b35]">Users ({data.length})</h2>
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
       {data.map(u => (
-        <motion.div layout key={u.id} className="bg-[#6d28d9] p-10 rounded-[3rem] flex flex-col items-center text-center shadow-2xl">
-          <div className="w-24 h-24 bg-[#ff6b35] rounded-full flex items-center justify-center text-3xl font-black mb-6 shadow-lg border-4 border-white/10">{u.initial}</div>
+        <motion.div layout key={u._id || u.id} className="bg-[#6d28d9] p-10 rounded-[3rem] flex flex-col items-center text-center shadow-2xl">
+          <div className="w-24 h-24 bg-[#ff6b35] rounded-full flex items-center justify-center text-3xl font-black mb-6 shadow-lg border-4 border-white/10">{u.name ? u.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() : "U"}</div>
           <h3 className="text-xl font-bold mb-1">{u.name}</h3>
           <p className="text-purple-200 text-sm mb-10">{u.email}</p>
           <div className="w-full space-y-4">
-            <button onClick={() => onBlock(u.id)} className="w-full bg-[#ff6b35] py-3.5 rounded-2xl font-bold uppercase text-xs">🚫 Block</button>
+            <button
+              onClick={() => onBlock(u)}
+              className="w-full bg-[#ff6b35] py-3.5 rounded-2xl font-bold uppercase text-xs"
+            >
+              {u.isBlocked ? "✅ Unblock" : "🚫 Block"}
+            </button>
             <button onClick={() => onRestrict(u)} className="w-full bg-[#ff6b35] py-3.5 rounded-2xl font-bold uppercase text-xs">🛡️ Restrict</button>
           </div>
         </motion.div>
@@ -869,9 +953,16 @@ const EditMeetupModal = ({ isOpen, onClose, meetup, onCreateNew, onSave }) => {
   );
 };
 
-const RestrictUserModal = ({ isOpen, onClose, user }) => {
-  const [res1, setRes1] = useState(true);
-  const [res2, setRes2] = useState(true);
+const RestrictUserModal = ({ isOpen, onClose, user, onSave }) => {
+  const [res1, setRes1] = useState(user?.permissions?.createMeetup ?? true);
+  const [res2, setRes2] = useState(user?.permissions?.addOthers ?? true);
+
+  useEffect(() => {
+    if (user) {
+      setRes1(user?.permissions?.createMeetup ?? true);
+      setRes2(user?.permissions?.addOthers ?? true);
+   }
+  }, [user]);
   return (
     <AnimatePresence>
       {isOpen && (
@@ -889,14 +980,14 @@ const RestrictUserModal = ({ isOpen, onClose, user }) => {
                 </div>
               </div>
               <div className="bg-[#6d28d9] p-8 rounded-[2.5rem]">
-                <h4 className="font-bold mb-4 text-left">Add Others</h4>
+                <h4 className="font-bold mb-4 text-left">Join Meetups</h4>
                 <div className="flex gap-4">
                   <button onClick={() => setRes2(true)} className={`flex-1 py-4 rounded-2xl font-black ${res2 ? 'bg-[#ff6b35]' : 'bg-[#060b1a] text-gray-500'}`}>Yes</button>
                   <button onClick={() => setRes2(false)} className={`flex-1 py-4 rounded-2xl font-black ${!res2 ? 'bg-[#ff6b35]' : 'bg-[#060b1a] text-gray-500'}`}>No</button>
                 </div>
               </div>
             </div>
-            <div className="flex gap-6 p-10 bg-black/20"><button onClick={onClose} className="flex-1 bg-[#ff6b35] py-5 rounded-2xl font-black uppercase">Cancel</button><button className="flex-1 bg-[#ff6b35] py-5 rounded-2xl font-black uppercase">Save</button></div>
+            <div className="flex gap-6 p-10 bg-black/20"><button onClick={onClose} className="flex-1 bg-[#ff6b35] py-5 rounded-2xl font-black uppercase">Cancel</button><button onClick={() => onSave(user, { createMeetup: res1, addOthers: res2 })} className="flex-1 bg-[#ff6b35] py-5 rounded-2xl font-black uppercase">Save</button></div>
           </motion.div>
         </div>
       )}

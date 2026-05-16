@@ -20,6 +20,8 @@ export default function MeetupPage() {
 
   const participantsRef = useRef(null);
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
+  const canCreateMeetup = loggedInUser?.permissions?.createMeetup !== false;
+  const canJoinMeetups = loggedInUser?.permissions?.addOthers !== false;
 
   /* =========================
       📡 API CALLS
@@ -101,6 +103,10 @@ export default function MeetupPage() {
   };
 
   const handleJoinMeetup = async (id) => {
+    if (!canJoinMeetups) {
+      alert("You are not allowed to join meetups");
+      return;
+    }
     if (!loggedInUser) return alert("Please login first");
     const res = await fetch(`http://localhost:5000/api/meetups/${id}/join`, {
       method: "PUT",
@@ -188,9 +194,16 @@ export default function MeetupPage() {
                   <button 
                     className="btn-send-request" 
                     onClick={() => handleJoinMeetup(selectedMeetup._id)}
-                    disabled={selectedMeetup.attendees.includes(loggedInUser?.name)}
+                    disabled={
+                      selectedMeetup.attendees.includes(loggedInUser?.name) ||
+                      !canJoinMeetups
+                    }
                   >
-                    {selectedMeetup.attendees.includes(loggedInUser?.name) ? "Joined ✓" : "Join Meetup"}
+                    {!canJoinMeetups
+                      ? "Restricted"
+                      : selectedMeetup.attendees.includes(loggedInUser?.name)
+                      ? "Joined ✓"
+                      : "Join Meetup"}
                   </button>
                 )}
               </div>
@@ -292,7 +305,19 @@ export default function MeetupPage() {
         </div>
       )}
       
-      <button className="floating-create-btn" onClick={() => setIsCreateModalOpen(true)}>👑 Create Meetup</button>
+      <button
+        className="floating-create-btn"
+        onClick={() => {
+          if (!canCreateMeetup) {
+            alert("You are not allowed to create meetups");
+            return;
+          }
+
+          setIsCreateModalOpen(true);
+        }}
+      >
+        👑 Create Meetup
+      </button>
     </div>
   );
 }

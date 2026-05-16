@@ -55,6 +55,12 @@ export default function LoginPage() {
         setError(data.message || "Login failed");
         return;
       }
+      if (data.user.isBlocked) {
+        setError("Your account has been blocked by admin");
+        return;
+      }
+
+
 
       // 🔥 التعديل هنا: نضمن وجود الـ id بشكل صريح داخل كائن المستخدم ليعمل البروفايل
       const userToStore = {
