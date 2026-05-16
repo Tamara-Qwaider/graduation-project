@@ -1,5 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { auth } from "./firebase";
+
+import {
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -30,6 +35,7 @@ export default function LoginPage() {
       navigate("/admin");
       return;
     }
+
 
     try {
       const res = await fetch("http://localhost:5000/api/auth/login", {
@@ -64,6 +70,67 @@ export default function LoginPage() {
     } catch (err) {
       setError("Server error");
     }
+
+  try {
+  // 🔥 تسجيل الدخول عبر Firebase
+const userCredential = await signInWithEmailAndPassword(
+  auth,
+  email,
+  password
+);
+
+const user = userCredential.user;
+
+// 🔥 تحديث بيانات التحقق
+await user.reload();
+
+if (!user.emailVerified) {
+  setError("Please verify your email first 📩");
+  return;
+}
+
+// 🔥 تسجيل الدخول في backend
+const res = await fetch("http://localhost:5000/api/auth/login", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    email,
+    password,
+  }),
+});
+
+const data = await res.json();
+
+if (!res.ok) {
+  setError(data.message || "Login failed");
+  return;
+}
+const userToStore = {
+  ...data.user,
+  id: data.user._id || data.user.id,
+};
+
+localStorage.setItem("token", data.token);
+localStorage.setItem("user", JSON.stringify(userToStore));
+
+
+setError("");
+
+if (!data.user.interests || data.user.interests.length === 0) {
+  navigate("/interests");
+} else {
+  navigate("/home");
+}
+} catch (err) {
+  if (err.code === "auth/invalid-credential") {
+  setError("Invalid email or password");
+} else {
+  setError(err.message);
+}
+}
+
   };
 
   const handleSignup = () => {

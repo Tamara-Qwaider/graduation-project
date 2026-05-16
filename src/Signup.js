@@ -1,10 +1,18 @@
 import { useNavigate, Link } from "react-router-dom";
 import { useState } from "react";
+import { auth } from "./firebase";
+
+import {
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+} from "firebase/auth";
 
 export default function SignupPage() {
   const navigate = useNavigate();
 
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [verificationSent, setVerificationSent] = useState(false);
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -24,10 +32,10 @@ export default function SignupPage() {
       return;
     }
 
-    if (password.length < 4) {
-      setError("Password must be at least 4 characters");
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
       return;
-    }
+   }
 
     if (password !== confirmPassword) {
       setError("Passwords do not match");
@@ -35,6 +43,67 @@ export default function SignupPage() {
     }
 
     try {
+
+  // إذا الإيميل انرسل مسبقًا
+  if (verificationSent) {
+
+    await auth.currentUser.reload();
+
+    if (auth.currentUser.emailVerified) {
+      await fetch("http://localhost:5000/api/auth/verify-email", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const res = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.message || "Login failed");
+        return;
+      }
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      localStorage.removeItem("interests");
+      localStorage.removeItem("hasInterests");
+
+      navigate("/interests");
+
+    } else {
+
+      setError("Please verify your email first 📩");
+
+    }
+
+    return;
+  }
+
+  // إنشاء الحساب لأول مرة
+  const userCredential = await createUserWithEmailAndPassword(
+    auth,
+    email,
+    password
+  );
+
+  await sendEmailVerification(userCredential.user);
+
+  setVerificationSent(true);
+
   const res = await fetch("http://localhost:5000/api/auth/signup", {
     method: "POST",
     headers: {
@@ -45,6 +114,8 @@ export default function SignupPage() {
       email,
       password,
       interests: [],
+      firebaseUID: userCredential.user.uid,
+      emailVerified: false,
     }),
   });
 
@@ -55,16 +126,25 @@ export default function SignupPage() {
     return;
   }
 
-  localStorage.setItem("token", data.token);
-  localStorage.setItem("user", JSON.stringify(data.user));
+  setMessage(
+  "Verification email sent 📩 Please verify then press Continue"
+);
+ setError("");
 
-  localStorage.removeItem("interests");
-  localStorage.removeItem("hasInterests");
-
-  setError("");
-  navigate("/interests");
 } catch (err) {
-  setError("Server error");
+
+  if (err.code === "auth/email-already-in-use") {
+    setError("Email already exists");
+
+  } else if (err.code === "auth/invalid-email") {
+    setError("Invalid email");
+
+  } else if (err.code === "auth/weak-password") {
+    setError("Password should be at least 6 characters");
+
+  } else {
+    setError(err.message);
+  }
 }
   };
 
@@ -207,6 +287,15 @@ export default function SignupPage() {
                 {error}
               </p>
             )}
+            {message && (
+              <p style={{ 
+                color: "#4ade80",
+                marginBottom: "10px",
+                fontSize: "14px"
+              }}>
+                {message}
+             </p>
+            )}
 
             <button
               type="submit"
@@ -233,7 +322,7 @@ export default function SignupPage() {
                 e.currentTarget.style.boxShadow = "0 8px 20px rgba(230,96,0,0.4)";
               }}
             >
-              Create Account
+              {verificationSent ? "Continue" : "Create Account"}
             </button>
           </form>
 

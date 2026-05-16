@@ -40,11 +40,26 @@ export default function AdminPage() {
 }, []);
 
   // --- البيانات ---
-  const [places, setPlaces] = useState([
-    { id: 1, name: "The Urban Cafe", desc: "Modern coffee shop with excellent ambiance and workspace facilities.", img: "https://images.unsplash.com/photo-1554118811-1e0d58224f24", loc: "Downtown", rate: "4.8", phone: "123-456" },
-    { id: 2, name: "Garden Bistro", desc: "Beautiful outdoor seating with garden views. Great for lunch meetings.", img: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4", loc: "West Side", rate: "4.5", phone: "987-654" },
-    { id: 3, name: "Skyline Lounge", desc: "Rooftop experience with a panoramic city view and premium services.", img: "https://images.unsplash.com/photo-1533777857889-4be7c70b33f7", loc: "Tower 1", rate: "4.9", phone: "555-000" },
-  ]);
+  const [places, setPlaces] = useState([]);
+  useEffect(() => {
+  const fetchPlaces = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/places");
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.log(data.message || "Failed to fetch places");
+        return;
+      }
+
+      setPlaces(data);
+    } catch (err) {
+      console.log("Error fetching places", err);
+    }
+  };
+
+  fetchPlaces();
+}, []);
 
   const [meetups, setMeetups] = useState([
     { id: 1, title: "Tech Networking Breakfast", loc: "The Urban Cafe", time: "April 22, 2026 • 9:00 AM", p: 3 },
@@ -90,6 +105,16 @@ export default function AdminPage() {
   };
 
   const handleAddPlace = async (newPlace) => {
+  const extraImages = newPlace.imagesText
+    .split("\n")
+    .map((url) => url.trim())
+    .filter(Boolean);
+
+  const allImages = [
+    newPlace.mainImage,
+    ...extraImages
+  ].filter(Boolean);
+  
   try {
     const res = await fetch("http://localhost:5000/api/places", {
       method: "POST",
@@ -99,11 +124,11 @@ export default function AdminPage() {
       body: JSON.stringify({
         name: newPlace.name,
         category: newPlace.category || "Suggestions",
-        image: newPlace.img,
+        image: newPlace.mainImage,
         location: newPlace.loc,
         rating: Number(newPlace.rate),
         description: newPlace.desc,
-        images: newPlace.img ? [newPlace.img] : [],
+        images: allImages,
       }),
     });
 
@@ -460,19 +485,23 @@ const PlacesSection = ({
       key={p._id || p.id}
       className="bg-[#6d28d9] rounded-[2.5rem] overflow-hidden shadow-2xl"
     >
-      <img src={p.img} alt="" className="h-72 w-full object-cover" />
+      <img
+        src={p.image || p.img}
+        alt=""
+        className="h-72 w-full object-cover"
+      />
 
       <div className="p-8">
         <h3 className="text-2xl font-bold mb-3">{p.name}</h3>
 
         <p className="text-purple-100 text-sm mb-4 h-12 overflow-hidden">
-          {p.desc}
+          {p.description ||p.desc}
         </p>
 
         <div className="flex items-center gap-4 text-xs font-bold text-purple-200 mb-8">
-          <span>📍 {p.loc}</span>
-          <span>⭐ {p.rate}</span>
-          <span>📞 {p.phone}</span>
+          <span>📍 {p.location ||p.loc}</span>
+          <span>⭐ {p.rating ||p.rate}</span>
+          {p.phone && <span>📞 {p.phone}</span>}
         </div>
 
         <div className="flex gap-4">
@@ -545,9 +574,11 @@ const UsersSection = ({ data, onRestrict, onBlock }) => (
 );
 
 const AddPlaceModal = ({ isOpen, onClose, onAdd, categories }) => {
+  const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
-    img: '',
+    mainImage: '',
+    imagesText: '',
     loc: '',
     rate: '',
     phone: '',
@@ -571,21 +602,31 @@ const AddPlaceModal = ({ isOpen, onClose, onAdd, categories }) => {
           animate={{ y: 0, opacity: 1 }}
           className="relative bg-[#161e31] w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden border border-white/10"
         >
-          <div className="px-10 pt-10 pb-6">
+          <div className="px-8 pt-8 pb-4">
             <h2 className="text-3xl font-black uppercase text-[#ff6b35]">
               Add New Place
             </h2>
           </div>
 
-          <div className="px-10 pb-10 space-y-4">
+          <div className="px-8 pb-8 space-y-3 ">
             <input
               type="text"
-              placeholder="Place Picture URL"
+              placeholder="Main Image URL"
               onChange={(e) =>
-                setFormData({ ...formData, img: e.target.value })
+                setFormData({ ...formData, mainImage: e.target.value })
               }
-              className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
+             className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
             />
+
+            <div className="flex justify-start">
+              <button
+                 type="button"
+                 onClick={() => setIsImagesModalOpen(true)}
+                 className="border border-[#ff6b35]/40 text-[#ff6b35] px-4 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-[#ff6b35]/10 transition-all"
+              >
+                + More Images
+              </button>
+            </div>
 
             <input
               type="text"
@@ -667,6 +708,56 @@ const AddPlaceModal = ({ isOpen, onClose, onAdd, categories }) => {
             </button>
           </div>
         </motion.div>
+        <AnimatePresence>
+  {isImagesModalOpen && (
+    <div className="fixed inset-0 z-[180] flex items-center justify-center p-6">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={() => setIsImagesModalOpen(false)}
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
+      />
+
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 border border-white/10 shadow-2xl"
+      >
+        <h3 className="text-2xl font-black uppercase text-[#ff6b35] mb-4">
+          Extra Images
+        </h3>
+
+        <textarea
+          value={formData.imagesText}
+          placeholder="One image URL per line"
+          rows="6"
+          onChange={(e) =>
+            setFormData({ ...formData, imagesText: e.target.value })
+          }
+          className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none"
+        />
+
+        <div className="flex gap-4 mt-6">
+          <button
+            onClick={() => setIsImagesModalOpen(false)}
+            className="flex-1 border border-white/10 py-3 rounded-xl font-black uppercase text-xs hover:bg-white/5"
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={() => setIsImagesModalOpen(false)}
+            className="flex-1 bg-[#ff6b35] py-3 rounded-xl font-black uppercase text-xs"
+          >
+            Done
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )}
+</AnimatePresence>
       </div>
     )}
   </AnimatePresence>
@@ -814,37 +905,54 @@ const RestrictUserModal = ({ isOpen, onClose, user }) => {
 };
 
 const EditPlaceModal = ({ isOpen, onClose, place, onSave }) => {
+  const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     loc: '',
     phone: '',
     desc: '',
     img: '',
+    imagesText: '',
     rate: '',
   });
 
   useEffect(() => {
-    if (place) {
-      setFormData({
-        name: place.name || '',
-        loc: place.loc || place.location || '',
-        phone: place.phone || '',
-        desc: place.desc || place.description || '',
-        img: place.img || place.image || '',
-        rate: place.rate || place.rating || '',
-      });
-    }
-  }, [place, isOpen]);
+  if (place) {
+    const mainImage = place.image || place.img || "";
+    const imagesArray = Array.isArray(place.images) ? place.images : [];
 
-  const handleSave = () => {
-    onSave({
-      ...place,
-      ...formData,
-      image: formData.img,
-      rating: Number(formData.rate),
-      description: formData.desc,
+    setFormData({
+      name: place.name || "",
+      loc: place.loc || place.location || "",
+      phone: place.phone || "",
+      desc: place.desc || place.description || "",
+      img: mainImage,
+      imagesText: imagesArray.join("\n"),
+      rate: place.rate || place.rating || "",
     });
-  };
+  }
+}, [place, isOpen]);
+
+ const handleSave = () => {
+  const imagesFromPopup = formData.imagesText
+    .split("\n")
+    .map((url) => url.trim())
+    .filter(Boolean);
+
+  const allImages = [
+    formData.img,
+    ...imagesFromPopup.filter((url) => url !== formData.img),
+  ].filter(Boolean);
+
+  onSave({
+    ...place,
+    ...formData,
+    image: formData.img,
+    images: allImages,
+    rating: Number(formData.rate),
+    description: formData.desc,
+  });
+};
 
   return (
     <AnimatePresence>
@@ -897,6 +1005,15 @@ const EditPlaceModal = ({ isOpen, onClose, place, onSave }) => {
                   }
                   className="w-full bg-[#6d28d9] p-3 rounded-xl outline-none focus:ring-2 focus:ring-[#ff6b35]"
                 />
+              </div>
+              <div className="flex justify-start">
+                <button
+                  type="button"
+                  onClick={() => setIsImagesModalOpen(true)}
+                  className="border border-[#ff6b35]/40 text-[#ff6b35] px-4 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-[#ff6b35]/10 transition-all"
+                >
+                  Edit More Images
+               </button>
               </div>
 
               {/* Rate */}
@@ -978,6 +1095,56 @@ const EditPlaceModal = ({ isOpen, onClose, place, onSave }) => {
               </button>
             </div>
           </motion.div>
+          <AnimatePresence>
+  {isImagesModalOpen && (
+    <div className="fixed inset-0 z-[180] flex items-center justify-center p-6">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={() => setIsImagesModalOpen(false)}
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
+      />
+
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 border border-white/10 shadow-2xl"
+      >
+        <h3 className="text-2xl font-black uppercase text-[#ff6b35] mb-4">
+          Edit Extra Images
+        </h3>
+
+        <textarea
+          value={formData.imagesText}
+          placeholder="One image URL per line"
+          rows="6"
+          onChange={(e) =>
+            setFormData({ ...formData, imagesText: e.target.value })
+          }
+          className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none"
+        />
+
+        <div className="flex gap-4 mt-6">
+          <button
+            onClick={() => setIsImagesModalOpen(false)}
+            className="flex-1 border border-white/10 py-3 rounded-xl font-black uppercase text-xs hover:bg-white/5"
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={() => setIsImagesModalOpen(false)}
+            className="flex-1 bg-[#ff6b35] py-3 rounded-xl font-black uppercase text-xs"
+          >
+            Done
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  )}
+</AnimatePresence>
         </div>
       )}
     </AnimatePresence>

@@ -7,6 +7,10 @@ import "./HomePage.css";
 export default function Home() {
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
+
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  
+
   const [placesData, setPlacesData] = useState([]);
   
   // الحفاظ على حالة الأماكن من كائن المستخدم
@@ -69,7 +73,13 @@ export default function Home() {
 
   // --- المكونات الداخلية والتصاميم (Card, Section) كما هي تماماً ---
   const Card = ({ item }) => (
-    <div onClick={() => setSelected(item)} className="home-card">
+     <div
+       onClick={() => {
+          setSelected(item);
+          setCurrentImageIndex(0);
+        }}
+        className="home-card"
+     >
       <img src={item.image} className="home-card-image" alt={item.name} />
       <div className="home-card-content">
         <h3>{item.name}</h3>
@@ -160,11 +170,57 @@ export default function Home() {
           <div className="home-popup-box">
             <button onClick={() => setSelected(null)} className="home-popup-close"><X /></button>
             <h2 className="home-popup-title">{selected.name}</h2>
-            <div className="home-popup-images">
-              {(selected.images?.length ? selected.images : [selected.image]).map((img, i) => (
-                <img key={i} src={img} alt={selected.name} className="home-popup-image" />
-              ))}
-            </div>
+
+            <div className="modern-gallery">
+              <button
+                className="gallery-arrow left"
+                onClick={() =>
+                  setCurrentImageIndex((prev) =>
+                    prev === 0
+                      ? (selected.images?.length || 1) - 1
+                      : prev - 1
+                  )
+               }
+              >
+                ❮
+              </button>
+
+              <img
+                src={
+                    selected.images?.[currentImageIndex] || selected.image
+                }
+                alt={selected.name}
+                className="modern-gallery-image"
+              />
+
+               <button
+                  className="gallery-arrow right"
+                  onClick={() =>
+                    setCurrentImageIndex((prev) =>
+                      prev === (selected.images?.length || 1) - 1
+                        ? 0
+                        : prev + 1
+                    )
+                  }
+                >
+                  ❯
+                </button>
+
+                <div className="gallery-dots">
+                  {(selected.images?.length
+                    ? selected.images
+                    : [selected.image]
+                 ).map((_, i) => (
+                   <div
+                     key={i}
+                     className={`gallery-dot ${
+                        currentImageIndex === i ? "active" : ""
+                     }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
             <div className="home-popup-info">
               <div className="home-popup-row"><span>📍</span><span>{selected.location}</span></div>
               <div className="home-popup-row"><Star size={16} /><span>{selected.rating} / 5</span></div>
