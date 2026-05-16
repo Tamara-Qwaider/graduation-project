@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Navbar from "./Navbar";
 import axios from "axios";
 import "./ActivityPage.css";
@@ -101,13 +101,13 @@ const StatCircle = ({ title, items }) => (
    ========================================================================== */
 
 export default function ActivityPage() {
-  // تم إزالة حالة الـ loading
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [currentActivities, setCurrentActivities] = useState([]);
   const [invites, setInvites] = useState([]);
   const [dashboardFocus, setDashboardFocus] = useState(null);
 
+  const dashboardRef = useRef(null);
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
 
   const fetchRealData = useCallback(async () => {
@@ -122,10 +122,12 @@ export default function ActivityPage() {
         );
         setCurrentActivities(joined);
 
-        const notJoined = allMeetups.filter(m => 
-          m.createdBy !== userName && !m.attendees.includes(userName)
+        const targetedInvites = allMeetups.filter(m => 
+          m.createdBy !== userName && 
+          !m.attendees.includes(userName) &&
+          m.invites?.includes(userName)
         );
-        setInvites(notJoined);
+        setInvites(targetedInvites);
 
         if (joined.length > 0 && !dashboardFocus) {
           setDashboardFocus(joined[0]);
@@ -141,9 +143,13 @@ export default function ActivityPage() {
   }, [fetchRealData]);
 
   const handleDetailsClick = (activity) => {
-    setDashboardFocus(activity);
     setSelectedActivity(activity);
     setIsPopupOpen(true);
+    setDashboardFocus(activity);
+
+    if (dashboardRef.current) {
+      dashboardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   };
 
   const handleJoin = async (id) => {
@@ -215,14 +221,15 @@ export default function ActivityPage() {
                 />
               ))
             ) : (
-              <p className="empty-text">No new meetups found. Create one!</p>
+              <p className="empty-text">No new meetups found.</p>
             )}
           </div>
         </section>
 
+        {/* 🛠️ تم تعديل الـ className هنا ليتطابق ويأخذ نفس خواص الـ Invites تماماً */}
         <section className="activity-section">
           <h3 className="section-heading">Current Activity</h3>
-          <div className="activities-list">
+          <div className="invites-scroll"> 
             {currentActivities.length > 0 ? (
               currentActivities.map(act => (
                 <ActivityCard 
@@ -238,7 +245,7 @@ export default function ActivityPage() {
           </div>
         </section>
 
-        <section className="activity-section">
+        <section className="activity-section" ref={dashboardRef}>
           <h3 className="section-heading centered">Dashboard Overview</h3>
           <div className="stats-scroll">
             {statsData.map((stat, index) => (

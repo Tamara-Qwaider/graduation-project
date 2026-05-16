@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import axios from "axios"; 
 import Navbar from "./Navbar";
 
 function Profile() {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(""); 
   const [hostedCount, setHostedCount] = useState(0);
 
   const [user, setUser] = useState({
@@ -24,7 +24,6 @@ function Profile() {
   useEffect(() => {
     const fetchProfileAndStats = async () => {
       try {
-        // 1. حماية المسار: التأكد من وجود مستخدم في LocalStorage
         const storedUserData = localStorage.getItem("user");
         if (!storedUserData || storedUserData === "undefined") {
           navigate("/login");
@@ -40,18 +39,17 @@ function Profile() {
         const userName = storedUser?.name;
         
         if (!userId || userId === "undefined") {
-          setLoading(false);
           return;
         }
 
-        // 2. جلب البيانات المحدثة
+        // 🛠️ تم التعديل هنا لاستخدام axios مباشرة
         const res = await axios.get(`http://localhost:5000/api/users/profile/${userId}`);
         if (res.data) {
           setUser(res.data);
           localStorage.setItem("user", JSON.stringify(res.data));
         }
 
-        // 3. جلب عدد الـ Meetups
+        // 🛠️ تم التعديل هنا لاستخدام axios مباشرة
         const meetupsRes = await axios.get("http://localhost:5000/api/meetups");
         if (meetupsRes.data && userName) {
           const myHostedMeetups = meetupsRes.data.filter(m => m.createdBy === userName);
@@ -60,21 +58,33 @@ function Profile() {
 
       } catch (err) {
         console.error("Fetch Error:", err);
-      } finally {
-        setLoading(false);
       }
     };
     
     fetchProfileAndStats();
   }, [navigate]);
 
-  // دالة حذف المكان المحفوظ
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      setImagePreview(URL.createObjectURL(file)); 
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedFile("REMOVE"); 
+    setImagePreview("REMOVE_PREVIEW"); 
+    setUser(prev => ({ ...prev, image: "" })); 
+  };
+
   const removePlace = async (placeId) => {
     try {
       if (!window.confirm("Are you sure you want to remove this place from your saved list?")) return;
 
       const updatedPlaces = user.savedPlaces.filter(p => p._id !== placeId);
       
+      // 🛠️ تم التعديل هنا لاستخدام axios مباشرة
       const res = await axios.put(`http://localhost:5000/api/users/profile/update/${user._id}`, {
         savedPlaces: updatedPlaces
       });
@@ -97,8 +107,14 @@ function Profile() {
       formData.append("name", user.name);
       formData.append("location", user.location);
       formData.append("bio", user.bio);
-      if (selectedFile) formData.append("image", selectedFile);
+      
+      if (selectedFile === "REMOVE") {
+        formData.append("image", ""); 
+      } else if (selectedFile) {
+        formData.append("image", selectedFile);
+      }
 
+      // 🛠️ تم التعديل هنا لاستخدام axios مباشرة
       const res = await axios.put(
         `http://localhost:5000/api/users/profile/update/${user._id}`, 
         formData,
@@ -106,11 +122,20 @@ function Profile() {
       );
 
       if (res.data.user) {
-        setUser(res.data.user);
+        const updatedUser = res.data.user;
+        
+        if (selectedFile === "REMOVE") {
+          updatedUser.image = "";
+        }
+
+        setUser(updatedUser);
         setIsEditing(false);
+        setSelectedFile(null);
+        setImagePreview("");
         alert("Profile Updated Successfully! ✨");
+        
         const currentLocal = JSON.parse(localStorage.getItem("user")) || {};
-        localStorage.setItem("user", JSON.stringify({ ...currentLocal, ...res.data.user }));
+        localStorage.setItem("user", JSON.stringify({ ...currentLocal, ...updatedUser }));
       }
     } catch (err) {
       console.error("Update Error:", err);
@@ -118,7 +143,10 @@ function Profile() {
     }
   };
 
-  if (loading) return <div style={loadingStyle}>Loading Profile...</div>;
+  const displayImage = imagePreview === "REMOVE_PREVIEW" ? "" : (imagePreview || user.image);
+  const hasValidImage = displayImage && 
+                        displayImage.trim() !== "" && 
+                        !displayImage.includes("unsplash.com");
 
   return (
     <div style={containerStyle}>
@@ -132,15 +160,35 @@ function Profile() {
         <div style={leftColumn}>
           <div style={glassCard}>
             <div style={profileImageContainer}>
-              <img 
-                src={user.image || "https://via.placeholder.com/150"} 
-                alt="profile" 
-                style={profileImgStyle} 
-              />
+              
+              {hasValidImage ? (
+                <img 
+                  src={displayImage} 
+                  alt="profile" 
+                  style={profileImgStyle} 
+                />
+              ) : (
+                <div style={emptyAvatarStyle}>
+                  👤
+                </div>
+              )}
+              
               {isEditing && (
-                <label style={cameraIconStyle}>
-                  📷 <input type="file" onChange={(e) => setSelectedFile(e.target.files[0])} style={{display:"none"}} accept="image/*" />
-                </label>
+                <>
+                  <label style={cameraIconStyle} title="Upload New Photo">
+                    📷 <input type="file" onChange={handleFileChange} style={{display:"none"}} accept="image/*" />
+                  </label>
+
+                  {hasValidImage && (
+                    <button 
+                      onClick={handleRemoveImage} 
+                      style={deleteImageIconStyle} 
+                      title="Remove Current Photo"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </>
               )}
             </div>
 
@@ -150,7 +198,7 @@ function Profile() {
                 <input style={inputStyle} value={user.location} onChange={(e)=>setUser({...user, location: e.target.value})} placeholder="Location" />
                 <textarea style={textareaStyle} value={user.bio} onChange={(e)=>setUser({...user, bio: e.target.value})} placeholder="Bio" />
                 <button onClick={saveChanges} style={saveBtnStyle}>Save Changes</button>
-                <button onClick={() => setIsEditing(false)} style={cancelBtnStyle}>Cancel</button>
+                <button onClick={() => { setIsEditing(false); setImagePreview(""); setSelectedFile(null); }} style={cancelBtnStyle}>Cancel</button>
               </div>
             ) : (
               <>
@@ -248,7 +296,11 @@ const rightColumn = { width: "68%", display: "flex", flexDirection: "column", ga
 const glassCard = { background: "rgba(78, 33, 155, 0.6)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)", padding: "30px 24px", borderRadius: "24px", textAlign: "center", boxShadow: "0 15px 35px rgba(0,0,0,0.4)" };
 const profileImageContainer = { position: "relative", width: "130px", height: "130px", margin: "0 auto 20px" };
 const profileImgStyle = { width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "3px solid #ff6b00", boxShadow: "0 0 20px rgba(255,107,0,0.5)" };
-const cameraIconStyle = { position: "absolute", bottom: "5px", right: "5px", background: "#ff6b00", borderRadius: "50%", padding: "7px", cursor: "pointer", fontSize: "14px" };
+
+const cameraIconStyle = { position: "absolute", bottom: "5px", right: "5px", background: "#ff6b00", borderRadius: "50%", padding: "7px", cursor: "pointer", fontSize: "14px", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", zIndex: 3 };
+const deleteImageIconStyle = { position: "absolute", bottom: "5px", left: "5px", background: "#dc2626", border: "none", borderRadius: "50%", padding: "7px", cursor: "pointer", fontSize: "14px", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", zIndex: 3 };
+
+const emptyAvatarStyle = { width: "100%", height: "100%", borderRadius: "50%", background: "rgba(255, 255, 255, 0.1)", border: "3px solid rgba(255, 255, 255, 0.2)", boxShadow: "0 0 15px rgba(255, 255, 255, 0.05)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "48px", color: "rgba(255, 255, 255, 0.4)" };
 const editFormStyle = { display: "flex", flexDirection: "column", gap: "12px", width: "100%", marginTop: "10px" };
 const inputStyle = { width: "100%", padding: "12px", borderRadius: "10px", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none", boxSizing: "border-box" };
 const textareaStyle = { ...inputStyle, minHeight: "80px", resize: "none" };
@@ -270,7 +322,6 @@ const placesGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fill, mi
 const placeCardStyle = { background: "rgba(0, 0, 0, 0.2)", borderRadius: "16px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", transition: "transform 0.3s ease", position: "relative" };
 const placeImgStyle = { width: "100%", height: "130px", objectFit: "cover" };
 const placeLocStyle = { color: "rgba(255,255,255,0.6)", fontSize: "12px", margin: 0 };
-const loadingStyle = { color: "#ff8a00", textAlign: "center", marginTop: "100px", fontSize: "20px", fontWeight: "bold" };
 const removeBtnStyle = { position: "absolute", top: "8px", right: "8px", background: "rgba(255, 50, 50, 0.8)", color: "white", border: "none", borderRadius: "50%", width: "26px", height: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", boxShadow: "0 2px 5px rgba(0,0,0,0.3)", zIndex: 2, transition: "all 0.2s ease" };
 
 export default Profile;

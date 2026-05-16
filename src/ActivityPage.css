@@ -40,34 +40,37 @@
   padding-left: 0;
 }
 
+/* ==========================================================================
+   🔄 التمرير الأفقي الموحد لقسم الـ Invites والـ Current Activities
+   ========================================================================== */
 .invites-scroll {
   width: 100%;
-  display: flex;
-  justify-content: center;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-start !important; /* تبدأ الكروت من اليسار وتتمدد لليمين بسلاسة */
+  align-items: stretch !important;
+  overflow-x: auto !important; /* تفعيل التمرير الأفقي بشكل صريح للقسمين */
+  overflow-y: hidden !important;
   gap: 24px;
-  overflow-x: auto;
-  padding-bottom: 10px;
-  scrollbar-width: none;
+  padding-bottom: 15px;
 }
 
-.stats-scroll {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 32px;
-  overflow-x: auto;
-  padding-bottom: 10px;
-  scrollbar-width: none;
+/* إظهار شريط تمرير نحيف وأنيق خاص بالـ Scroll الأفقي الموحد */
+.invites-scroll::-webkit-scrollbar {
+  height: 6px !important;
+  display: block !important;
 }
 
-.invites-scroll::-webkit-scrollbar,
-.stats-scroll::-webkit-scrollbar {
-  display: none;
+.invites-scroll::-webkit-scrollbar-thumb {
+  background: rgba(230, 96, 0, 0.6) !important; /* اللون البرتقالي المميز ليوضح أنه قابل للسحب */
+  border-radius: 10px !important;
 }
 
+/* تثبيت حجم كرت الـ Invite ومنعه من الانكماش داخل الشريط الأفقي */
 .invite-card {
-  min-width: 320px;
+  flex: 0 0 340px !important;
+  min-width: 340px !important;
   max-width: 380px;
   background: #4e219b;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -80,6 +83,44 @@
 
 .invite-card:hover {
   transform: translateY(-6px);
+}
+
+/* 🛠️ تعديل كرت الـ Current Activity ليتناسب تماماً مع السكرول الأفقي */
+.activity-card {
+  flex: 0 0 340px !important; /* جبر الكارت على أخذ حجم ثابت ومنعه من الانكماش */
+  min-width: 340px !important;
+  background: rgba(78, 33, 155, 0.45);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 22px;
+  display: flex;
+  gap: 18px;
+  flex-shrink: 0; /* منع الـ flexbox من ضغط الكارت */
+  transition: 0.25s ease;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.22);
+}
+
+.activity-card:hover {
+  transform: translateY(-4px);
+}
+
+/* ==========================================================================
+   بقية ديزاين الصفحة الأصلي (مضمون 100% لم يتأثر)
+   ========================================================================== */
+.stats-scroll {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  scrollbar-width: none;
+}
+
+.stats-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .invite-card-top {
@@ -176,24 +217,6 @@
 
 .deny-btn:hover {
   background: rgba(255, 0, 0, 0.15);
-}
-
-.activity-card {
-  width: 100%;
-  background: rgba(78, 33, 155, 0.45);
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 24px;
-  padding: 22px;
-  display: flex;
-  gap: 18px;
-  margin-bottom: 18px;
-  transition: 0.25s ease;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.22);
-}
-
-.activity-card:hover {
-  transform: translateY(-4px);
 }
 
 .activity-card-left-icon {
@@ -437,8 +460,7 @@
   font-size: 24px;
 }
 
-.activity-popup-row small,
-.activity-popup-participants small {
+.activity-popup-row small {
   display: block;
   margin-bottom: 4px;
   font-size: 0.65rem;
@@ -450,63 +472,6 @@
 
 .activity-popup-row p {
   margin: 0;
-}
-
-.activity-popup-participants {
-  padding: 4px 2px;
-}
-
-.participants-avatars-row {
-  display: flex;
-  align-items: center;
-  margin-top: 10px;
-}
-
-.participant-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  object-fit: cover;
-  border: 2px solid #4e219b;
-  margin-right: -10px;
-}
-
-.participant-more-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  background: #e66000;
-  border: 2px solid #4e219b;
-  color: white;
-  font-size: 0.72rem;
-  font-weight: 800;
-  cursor: pointer;
-  margin-left: 8px;
-}
-
-.participants-list-box {
-  margin-top: 16px;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 18px;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  max-height: 140px;
-  overflow-y: auto;
-}
-
-.participants-list-box ul {
-  margin: 0;
-  padding-left: 18px;
-}
-
-.participants-list-box li {
-  margin-bottom: 8px;
-  font-size: 0.88rem;
-}
-
-.more-members {
-  color: rgba(255, 255, 255, 0.45);
-  font-style: italic;
 }
 
 .activity-popup-main-btn {
@@ -530,7 +495,9 @@
   }
 
   .activity-card {
-    flex-direction: column;
+    /* للحفاظ على مظهر الموبايل مستقراً وأفقياً أيضاً بداخل السكرول */
+    flex: 0 0 280px !important; 
+    min-width: 280px !important;
   }
 
   .stat-circle {
@@ -540,7 +507,7 @@
   }
 
   .invite-card {
-    min-width: 280px;
+    min-width: 280px !important;
+    max-width: 280px !important;
   }
-
 }

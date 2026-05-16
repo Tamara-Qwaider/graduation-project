@@ -9,9 +9,11 @@ export default function MeetupPage() {
   ========================= */
   const emptyForm = { placeName: "", meetupName: "", date: "", time: "", invitePeople: [], notes: "" };
   const [searchTerm, setSearchTerm] = useState("");
+  const [userSearchTerm, setUserSearchTerm] = useState(""); // حالة خاصة ببحث المستخدمين بداخل الـ Dropdown
   const [selectedMeetup, setSelectedMeetup] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showInviteDropdown, setShowInviteDropdown] = useState(false); 
   const [formData, setFormData] = useState(emptyForm);
   const [meetups, setMeetups] = useState([]);
   const [allUsers, setAllUsers] = useState([]); 
@@ -22,17 +24,14 @@ export default function MeetupPage() {
   /* =========================
       📡 API CALLS
   ========================= */
-  
-  // دالة جلب اللقاءات
-  const fetchMeetups = async () => {
+  const fetchMeetups = useCallback(async () => {
     try {
       const res = await fetch("http://localhost:5000/api/meetups");
       const data = await res.json();
       setMeetups(data);
     } catch (err) { console.error("Fetch error:", err); }
-  };
+  }, []);
 
-  // دالة جلب المستخدمين لدعوتهم
   const fetchUsers = useCallback(async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/users");
@@ -41,11 +40,10 @@ export default function MeetupPage() {
     } catch (err) { console.error("Error fetching users:", err); }
   }, [loggedInUser?.name]);
 
-  // تشغيل الجلب مرة واحدة فقط عند تحميل الصفحة لمنع الـ Infinite Loop
   useEffect(() => { 
     fetchMeetups(); 
     fetchUsers();
-  }, [fetchUsers]); 
+  }, [fetchMeetups, fetchUsers]); 
 
   /* =========================
       ⚙️ HANDLERS
@@ -60,7 +58,7 @@ export default function MeetupPage() {
       location: formData.placeName,
       date: formData.date,
       time: formData.time,
-      invitedPeople: formData.invitePeople, 
+      invitedPeople: formData.invitePeople,
       notes: formData.notes,
       createdBy: loggedInUser?.name || "Guest",
       attendees: [loggedInUser?.name || "Host"],
@@ -76,6 +74,8 @@ export default function MeetupPage() {
       if (res.ok) { 
         fetchMeetups(); 
         setIsCreateModalOpen(false);
+        setShowInviteDropdown(false); 
+        setUserSearchTerm(""); 
         setFormData(emptyForm); 
         alert("Meetup created and invites sent! ✨");
       }
@@ -201,11 +201,11 @@ export default function MeetupPage() {
 
       {/* CREATE MODAL */}
       {isCreateModalOpen && (
-        <div className="popup-overlay" onClick={() => setIsCreateModalOpen(false)}>
+        <div className="popup-overlay" onClick={() => { setIsCreateModalOpen(false); setShowInviteDropdown(false); }}>
           <div className="create-popup-content" onClick={e => e.stopPropagation()}>
             <div className="create-popup-header">
               <h2>CREATE MEETUP</h2>
-              <button className="close-x-btn" onClick={() => setIsCreateModalOpen(false)}>✕</button>
+              <button className="close-x-btn" onClick={() => { setIsCreateModalOpen(false); setShowInviteDropdown(false); }}>✕</button>
             </div>
             <div className="create-popup-body">
               <div className="input-group">
@@ -227,24 +227,65 @@ export default function MeetupPage() {
                 </div>
               </div>
 
-              <div className="input-group">
-                <label>Invite People</label>
-                <div className="users-invite-list">
-                  {allUsers.map(user => (
-                    <div 
-                      key={user._id} 
-                      className={`user-chip ${formData.invitePeople.includes(user.name) ? "selected" : ""}`}
-                      onClick={() => handleToggleInvite(user.name)}
-                    >
-                      {user.name}
-                    </div>
-                  ))}
-                  {allUsers.length === 0 && <p style={{fontSize: "12px", color: "#aaa"}}>No other users found.</p>}
+              {/* قسم الدعوات بنظام السهم والبحث المتطابق مع الهوية البصرية */}
+              <div className="prof-invite-section">
+                <div 
+                  className={`prof-invite-toggle ${showInviteDropdown ? "active" : ""}`}
+                  onClick={() => setShowInviteDropdown(!showInviteDropdown)}
+                >
+                  <label>Invite People ({formData.invitePeople.length} selected)</label>
+                  <span className="prof-arrow-icon">▼</span>
                 </div>
+
+                {showInviteDropdown && (
+                  <div className="prof-dropdown-content">
+                    {/* حقل بحث مقتبس هندسياً من شريط بحث موقعكِ الأساسي */}
+                    <div className="prof-search-wrapper">
+                      <span className="prof-search-icon">🔍</span>
+                      <input 
+                        type="text" 
+                        placeholder="Search profiles by name..." 
+                        className="prof-search-input" 
+                        value={userSearchTerm}
+                        onChange={(e) => setUserSearchTerm(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="prof-users-grid">
+                      {allUsers
+                        .filter(user => user.name.toLowerCase().includes(userSearchTerm.toLowerCase()))
+                        .map(user => {
+                          const isSelected = formData.invitePeople.includes(user.name);
+                          return (
+                            <div 
+                              key={user._id} 
+                              className={`prof-user-card ${isSelected ? "selected" : ""}`}
+                              onClick={() => handleToggleInvite(user.name)}
+                            >
+                              <div className="prof-avatar">
+                                {user.name.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="prof-username">{user.name}</span>
+                              {isSelected && <span className="prof-check-mark">✓</span>}
+                            </div>
+                          );
+                        })}
+                      {allUsers.filter(user => user.name.toLowerCase().includes(userSearchTerm.toLowerCase())).length === 0 && (
+                        <p className="prof-no-users">No profiles match your search.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="create-action-wrapper">
-                <button className="btn-final-create" onClick={handleCreateMeetup}>CREATE & INVITE</button>
+              {/* أزرار التحكم - تحافظ على كلاسات التصميم الأصلي القديم 100% */}
+              <div className="popup-action-btns" style={{ marginTop: "25px", paddingTop: "15px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                <button className="btn-cancel-popup" onClick={() => { setIsCreateModalOpen(false); setShowInviteDropdown(false); }}>
+                  Close
+                </button>
+                <button className="btn-send-request" onClick={handleCreateMeetup}>
+                  CREATE & INVITE
+                </button>
               </div>
             </div>
           </div>
