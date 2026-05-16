@@ -4,69 +4,77 @@ import { Bookmark, Users, Search, Star, X } from "lucide-react";
 import Navbar from "./Navbar";
 import "./HomePage.css";
 
-
 export default function Home() {
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
-  const [savedPlaces, setSavedPlaces] = useState(() => {
-    return JSON.parse(localStorage.getItem("savedPlaces")) || [];
-  });
   const [placesData, setPlacesData] = useState([]);
-  useEffect(() => {
-  const fetchPlaces = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/places");
-      const data = await res.json();
-      setPlacesData(data);
-    } catch (err) {
-      console.log("Error fetching places", err);
-    }
-  };
+  
+  // الحفاظ على حالة الأماكن من كائن المستخدم
+  const [savedPlaces, setSavedPlaces] = useState(() => {
+    const user = JSON.parse(localStorage.getItem("user"));
+    return user?.savedPlaces || [];
+  });
 
-  fetchPlaces();
-}, []);
   const navigate = useNavigate();
 
-  const categories = [...new Set(placesData.map((p) => p.category))];
-  const userInterests = JSON.parse(localStorage.getItem("interests")) || [];
+  useEffect(() => {
+    const fetchPlaces = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/places");
+        const data = await res.json();
+        setPlacesData(data);
+      } catch (err) { console.log("Error fetching places", err); }
+    };
+    fetchPlaces();
+  }, []);
 
-  const cleanText = (text) =>
-    text.toLowerCase().replace(/[^\w\s]/g, "").trim();
+  // --- دالة الحفظ المحدثة (ترسل الإضافة فقط) ---
+  const toggleSave = async (place) => {
+    const storedUser = JSON.parse(localStorage.getItem("user"));
+    const userId = storedUser?._id || storedUser?.id;
 
-  const recommendedPlaces = placesData.filter((place) =>
-    userInterests.some((interest) => {
-      const cleanInterest = cleanText(interest);
-      const cleanCategory = cleanText(place.category);
-
-      return (
-        cleanInterest.includes(cleanCategory) ||
-        cleanCategory.includes(cleanInterest.split(" ")[0])
-      );
-    })
-  );
-
-  const toggleSave = (place) => {
-    const isSaved = savedPlaces.some((p) => p.id === place.id);
-    let updatedPlaces;
-    if (isSaved) {
-      updatedPlaces = savedPlaces.filter((p) => p.id !== place.id);
-    } else {
-      updatedPlaces = [...savedPlaces, place];
+    if (!userId) {
+      alert("Please login first!");
+      return;
     }
-    setSavedPlaces(updatedPlaces);
-    localStorage.setItem("savedPlaces", JSON.stringify(updatedPlaces));
+
+    const isAlreadySaved = savedPlaces.some(p => (p._id || p.id) === (place._id || place.id));
+    let payload = {};
+
+    if (isAlreadySaved) {
+      // للحذف: نرسل المصفوفة الجديدة كاملة بدون العنصر
+      const newList = savedPlaces.filter(p => (p._id || p.id) !== (place._id || place.id));
+      payload = { savedPlaces: newList };
+    } else {
+      // للإضافة: نرسل المكان كـ "newPlace" لكي يضيفه السيرفر للموجود
+      payload = { newPlace: place };
+    }
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/users/profile/update/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("user", JSON.stringify(data.user));
+        setSavedPlaces(data.user.savedPlaces || []);
+      }
+    } catch (err) {
+      console.error("Save Error", err);
+    }
   };
 
+  // --- المكونات الداخلية والتصاميم (Card, Section) كما هي تماماً ---
   const Card = ({ item }) => (
     <div onClick={() => setSelected(item)} className="home-card">
       <img src={item.image} className="home-card-image" alt={item.name} />
       <div className="home-card-content">
         <h3>{item.name}</h3>
         <p>{item.location}</p>
-        <div className="home-rating">
-          <Star size={14} />
-          {item.rating}
-        </div>
+        <div className="home-rating"><Star size={14} /> {item.rating}</div>
       </div>
     </div>
   );
@@ -75,200 +83,102 @@ export default function Home() {
     const scrollRef = useRef(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
-
     const checkScroll = () => {
       const el = scrollRef.current;
       if (!el) return;
       setCanScrollLeft(el.scrollLeft > 0);
       setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
     };
-
     const scroll = (direction) => {
       const container = scrollRef.current;
       if (!container) return;
-      container.scrollBy({
-        left: direction === "left" ? -300 : 300,
-        behavior: "smooth",
-      });
+      container.scrollBy({ left: direction === "left" ? -300 : 300, behavior: "smooth" });
       setTimeout(checkScroll, 200);
     };
-
-    useEffect(() => {
-      checkScroll();
-    }, [items]);
-
+    useEffect(() => { checkScroll(); }, [items]);
     return (
       <div className="home-section">
-        <div className="home-section-header">
-          <h2>{title}</h2>
-        </div>
+        <div className="home-section-header"><h2>{title}</h2></div>
         <div className="home-scroll-row">
           <div className="home-arrow-space">
-            {canScrollLeft && (
-              <button onClick={() => scroll("left")} className="home-arrow-btn">
-                ❮
-              </button>
-            )}
+            {canScrollLeft && <button onClick={() => scroll("left")} className="home-arrow-btn">❮</button>}
           </div>
-          <div
-            ref={scrollRef}
-            onScroll={checkScroll}
-            className="home-cards-scroll no-scrollbar"
-          >
-            {items.map((item) => (
-              <Card key={item.id} item={item} />
-            ))}
+          <div ref={scrollRef} onScroll={checkScroll} className="home-cards-scroll no-scrollbar">
+            {items.map((item) => <Card key={item._id || item.id} item={item} />)}
           </div>
           <div className="home-arrow-space">
-            {canScrollRight && (
-              <button onClick={() => scroll("right")} className="home-arrow-btn">
-                ❯
-              </button>
-            )}
+            {canScrollRight && <button onClick={() => scroll("right")} className="home-arrow-btn">❯</button>}
           </div>
         </div>
       </div>
     );
   };
 
+  // معالجة الفئات والتوصيات
+  const categories = [...new Set(placesData.map((p) => p.category))];
+  const userInterests = JSON.parse(localStorage.getItem("interests")) || [];
+  const cleanText = (text) => text.toLowerCase().replace(/[^\w\s]/g, "").trim();
+  const recommendedPlaces = placesData.filter((place) =>
+    userInterests.some((interest) => {
+      const cleanInterest = cleanText(interest);
+      const cleanCategory = cleanText(place.category);
+      return cleanInterest.includes(cleanCategory) || cleanCategory.includes(cleanInterest.split(" ")[0]);
+    })
+  );
+
   return (
     <div className="home-page-bg" style={{ position: "relative" }}>
       <style>{`
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-
-        /* تنسيق العنوان العلوي اليساري الجديد */
-        .vibe-top-header {
-          position: absolute;
-          top: 25px;
-          left: 30px;
-          font-size: 2.8rem;
-          font-weight: 900;
-          letter-spacing: 6px;
-          text-transform: uppercase;
-          z-index: 50;
-          /* تدرج لوني يناسب الثيم الداكن */
-          background: linear-gradient(135deg, #ffffff 0%, #a855f7 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          filter: drop-shadow(0px 4px 8px rgba(168, 85, 247, 0.4));
-          pointer-events: none;
-        }
-
-        /* إضافة مسافة علوية للـ Navbar والبحث لتفادي التداخل */
-        .content-body {
-          padding-top: 20px;
-        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .vibe-top-header { position: absolute; top: 25px; left: 30px; font-size: 2.8rem; font-weight: 900; letter-spacing: 6px; text-transform: uppercase; z-index: 50; background: linear-gradient(135deg, #ffffff 0%, #a855f7 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0px 4px 8px rgba(168, 85, 247, 0.4)); pointer-events: none; }
+        .content-body { padding-top: 20px; }
+        .home-save-btn.saved { color: #ff8a00 !important; fill: #ff8a00; }
       `}</style>
 
-      {/* العنوان الجديد المضاف */}
       <h1 className="vibe-top-header">VIBE</h1>
-
       <div className="content-body">
         <Navbar />
-
         <div className="home-search-wrapper">
           <div className="home-search-box">
             <Search className="home-search-icon" />
-            <input
-              placeholder="Search..."
-              className="home-search-input"
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <input placeholder="Search..." className="home-search-input" onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
 
         {recommendedPlaces.length > 0 && (
-          <Section
-            title="Recommended For You"
-            items={recommendedPlaces.filter((p) => {
-              const term = search.toLowerCase();
-              return `${p.name} ${p.location} ${p.category}`
-                .toLowerCase()
-                .includes(term);
-            })}
-          />
+          <Section title="Recommended For You" items={recommendedPlaces.filter(p => `${p.name} ${p.location}`.toLowerCase().includes(search.toLowerCase()))} />
         )}
 
         {categories.map((cat) => (
-          <Section
-            key={cat}
-            title={cat}
-            items={placesData
-              .filter((p) => p.category === cat)
-              .filter((p) => {
-                const term = search.toLowerCase();
-                return `${p.name} ${p.location} ${p.category}`
-                  .toLowerCase()
-                  .includes(term);
-              })}
-          />
+          <Section key={cat} title={cat} items={placesData.filter(p => p.category === cat && `${p.name} ${p.location}`.toLowerCase().includes(search.toLowerCase()))} />
         ))}
       </div>
 
       {selected && (
         <div className="home-popup-overlay">
           <div className="home-popup-box">
-            <button
-              onClick={() => setSelected(null)}
-              className="home-popup-close"
-            >
-              <X />
-            </button>
+            <button onClick={() => setSelected(null)} className="home-popup-close"><X /></button>
             <h2 className="home-popup-title">{selected.name}</h2>
             <div className="home-popup-images">
-              {(selected.images?.length ? selected.images : [selected.image]).map(
-                (img, i) => (
-                  <img
-                    key={i}
-                    src={img}
-                    alt={selected.name}
-                    className="home-popup-image"
-                  />
-                )
-              )}
+              {(selected.images?.length ? selected.images : [selected.image]).map((img, i) => (
+                <img key={i} src={img} alt={selected.name} className="home-popup-image" />
+              ))}
             </div>
             <div className="home-popup-info">
-              <div className="home-popup-row">
-                <span>📍</span>
-                <span>{selected.location}</span>
-              </div>
-              <div className="home-popup-row">
-                <Star size={16} />
-                <span>{selected.rating} / 5</span>
-              </div>
-              <div>
-                <p className="home-popup-about-title">About</p>
-                <p>{selected.description}</p>
-              </div>
+              <div className="home-popup-row"><span>📍</span><span>{selected.location}</span></div>
+              <div className="home-popup-row"><Star size={16} /><span>{selected.rating} / 5</span></div>
+              <div><p className="home-popup-about-title">About</p><p>{selected.description}</p></div>
             </div>
             <div className="home-popup-actions">
-              <button
-                onClick={() => toggleSave(selected)}
-                className={`home-save-btn ${
-                  savedPlaces.some((p) => p.id === selected.id) ? "saved" : ""
-                }`}
+              <button 
+                onClick={() => toggleSave(selected)} 
+                className={`home-save-btn ${savedPlaces.some((p) => (p._id || p.id) === (selected._id || selected.id)) ? "saved" : ""}`}
               >
                 <Bookmark size={18} />
               </button>
-              <button
-                onClick={() => {
-                  navigate("/meetups", {
-                    state: {
-                      openCreate: true,
-                      place: selected,
-                    },
-                  });
-                }}
-                className="home-create-btn"
-              >
-                <Users size={18} />
-                Create a Meetup
+              <button onClick={() => navigate("/meetups", { state: { openCreate: true, place: selected } })} className="home-create-btn">
+                <Users size={18} /> Create a Meetup
               </button>
             </div>
           </div>

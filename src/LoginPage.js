@@ -8,7 +8,7 @@ export default function LoginPage() {
 
   const navigate = useNavigate();
 
-  const handleLogin = async (e)  => {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
     // ✅ validation
@@ -30,34 +30,40 @@ export default function LoginPage() {
       navigate("/admin");
       return;
     }
-  try {
-  const res = await fetch("http://localhost:5000/api/auth/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email,
-      password,
-    }),
-  });
 
-  const data = await res.json();
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+        }),
+      });
 
-  if (!res.ok) {
-    setError(data.message || "Login failed");
-    return;
-  }
+      const data = await res.json();
 
-  // 🔥 تخزين البيانات من backend
-  localStorage.setItem("token", data.token);
-  localStorage.setItem("user", JSON.stringify(data.user));
+      if (!res.ok) {
+        setError(data.message || "Login failed");
+        return;
+      }
 
-  setError("");
-  navigate("/home");
-} catch (err) {
-  setError("Server error");
-}
+      // 🔥 التعديل هنا: نضمن وجود الـ id بشكل صريح داخل كائن المستخدم ليعمل البروفايل
+      const userToStore = {
+        ...data.user,
+        id: data.user._id || data.user.id // التوافق مع backend بوجود _id أو id
+      };
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(userToStore));
+
+      setError("");
+      navigate("/home");
+    } catch (err) {
+      setError("Server error");
+    }
   };
 
   const handleSignup = () => {
