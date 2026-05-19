@@ -1,17 +1,29 @@
 import { Navigate } from "react-router-dom";
 
-export default function ProtectedRoute({ children }) {
+export default function ProtectedRoute({
+  children,
+  adminOnly = false,
+}) {
   const userString = localStorage.getItem("user");
+  const token = localStorage.getItem("token");
 
-  if (!userString) {
+  if (!userString || !token) {
     return <Navigate to="/" replace />;
   }
 
   try {
-    JSON.parse(userString);
+    const user = JSON.parse(userString);
+
+    // حماية صفحات الأدمن
+    if (adminOnly && user.role !== "admin") {
+      return <Navigate to="/home" replace />;
+    }
+
+    return children;
   } catch (e) {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+
     return <Navigate to="/" replace />;
   }
-
-  return children;
 }

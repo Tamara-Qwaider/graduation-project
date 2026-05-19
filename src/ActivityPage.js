@@ -30,7 +30,7 @@ const DetailsPopup = ({ isOpen, onClose, activity }) => {
           </div>
           <div className="activity-popup-row">
             <span>👤</span>
-            <div><small>Hosted By</small><p>{activity.createdBy || "System"}</p></div>
+            <div><small>Hosted By</small><p>{typeof activity.createdBy === "string" ? activity.createdBy : activity.createdBy?.name || "System"}</p></div>
           </div>
         </div>
         <button className="activity-popup-main-btn" onClick={onClose}>Close Details</button>
@@ -45,7 +45,7 @@ const InviteCard = ({ _id, title, location, createdBy, date, time, attendees, on
       <div className="invite-icon">📍</div>
       <div>
         <h3>{title || location}</h3>
-        <p>Hosted by {createdBy}</p>
+        <p>Hosted by {typeof createdBy === "string" ? createdBy : createdBy?.name}</p>
       </div>
     </div>
     <div className="invite-details">
@@ -65,7 +65,7 @@ const ActivityCard = ({ _id, title, createdBy, date, time, location, attendees, 
     <div className="activity-card-left-icon">{icon || "⛺"}</div>
     <div className="activity-card-content">
       <h4>{title}</h4>
-      <p>Hosted by {createdBy}</p>
+      <p>Hosted by {typeof createdBy === "string" ? createdBy : createdBy?.name}</p>
       <div className="activity-meta">
         <span>📅 {new Date(date).toLocaleDateString()} {time ? `• ${time}` : ""}</span>
         <span>👥 {attendees?.length || 0} people</span>
@@ -109,24 +109,50 @@ export default function ActivityPage() {
 
   const dashboardRef = useRef(null);
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
+  const token = localStorage.getItem("token");
 
   const fetchRealData = useCallback(async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/meetups");
+      const response = await axios.get(
+        "http://localhost:5000/api/meetups",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       const allMeetups = response.data;
-      const userName = loggedInUser?.name;
+      const userId = loggedInUser?.id || loggedInUser?._id;
 
-      if (userName) {
-        const joined = allMeetups.filter(m => 
-          m.createdBy === userName || m.attendees.includes(userName)
-        );
+      if (userId) {
+        const joined = allMeetups.filter((m) => {
+          const createdByMatch =
+            m.createdBy?.id === userId;
+
+          const attendeeMatch =
+            m.attendees?.some((p) =>
+              typeof p === "string"
+              ? false
+              : p.id === userId
+            );
+
+          return createdByMatch || attendeeMatch;
+        });
         setCurrentActivities(joined);
 
-        const targetedInvites = allMeetups.filter(m => 
-          m.createdBy !== userName && 
-          !m.attendees.includes(userName) &&
-          m.invites?.includes(userName)
-        );
+        const targetedInvites = allMeetups.filter((m) => {
+          const createdByMatch =
+            m.createdBy?.id === userId;
+
+          const attendeeMatch =
+            m.attendees?.some((p) =>
+              typeof p === "string"
+             ? false
+             : p.id === userId
+            );
+
+          return !createdByMatch && !attendeeMatch;
+        });
         setInvites(targetedInvites);
 
         if (joined.length > 0 && !dashboardFocus) {
@@ -136,7 +162,7 @@ export default function ActivityPage() {
     } catch (err) {
       toast.error("Failed to load real activities.");
     }
-  }, [loggedInUser?.name, dashboardFocus]);
+  }, [loggedInUser?.id, loggedInUser?._id, dashboardFocus, token]);
 
   useEffect(() => {
     fetchRealData();
@@ -154,9 +180,20 @@ export default function ActivityPage() {
 
   const handleJoin = async (id) => {
     try {
-      const res = await axios.put(`http://localhost:5000/api/meetups/${id}/join`, {
-        userName: loggedInUser.name
-      });
+      const res = await axios.put(
+        `http://localhost:5000/api/meetups/${id}/join`,
+        {
+          user: {
+            id: loggedInUser.id || loggedInUser._id,
+            name: loggedInUser.name,
+         }
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       if (res.status === 200) {
         toast.success("Joined successfully! 🎉");
         fetchRealData(); 
@@ -166,16 +203,29 @@ export default function ActivityPage() {
     }
   };
 
-  const handleLeaveActivity = async (id) => {
-    if (!window.confirm("Are you sure you want to leave this activity?")) return;
-    try {
-      await axios.delete(`http://localhost:5000/api/meetups/${id}`);
-      toast.success("Activity removed");
-      fetchRealData();
-    } catch (err) {
-      toast.error("Error leaving activity.");
-    }
-  };
+ const handleLeaveActivity = async (id) => {
+  try {
+    await axios.put(
+      `http://localhost:5000/api/meetups/${id}/leave`,
+     {
+       user: {
+          id: loggedInUser.id || loggedInUser._id,
+          name: loggedInUser.name,
+        },
+     },
+     {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+     }
+    );
+
+    toast.success("You left the activity");
+    fetchRealData();
+  } catch (err) {
+    toast.error("Error leaving activity.");
+  }
+};
 
   const statsData = [
     {

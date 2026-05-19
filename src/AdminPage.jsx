@@ -8,6 +8,7 @@ export default function AdminPage() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate(); // تعريف الـ Navigate
+  const token = localStorage.getItem("token");
 
   // دالة تسجيل الخروج
   const handleLogout = () => {
@@ -28,7 +29,11 @@ export default function AdminPage() {
   useEffect(() => {
   const fetchCategories = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/categories");
+      const res = await fetch("http://localhost:5000/api/categories", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       const data = await res.json();
       setCategories(data);
     } catch (err) {
@@ -37,14 +42,18 @@ export default function AdminPage() {
   };
 
   fetchCategories();
-}, []);
+}, [token]);
 
   // --- البيانات ---
   const [places, setPlaces] = useState([]);
   useEffect(() => {
   const fetchPlaces = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/places");
+      const res = await fetch("http://localhost:5000/api/places", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -59,7 +68,7 @@ export default function AdminPage() {
   };
 
   fetchPlaces();
-}, []);
+}, [token]);
 
   const [meetups, setMeetups] = useState([
     { id: 1, title: "Tech Networking Breakfast", loc: "The Urban Cafe", time: "April 22, 2026 • 9:00 AM", p: 3 },
@@ -72,7 +81,11 @@ export default function AdminPage() {
 useEffect(() => {
   const fetchUsers = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/users");
+      const res = await fetch("http://localhost:5000/api/users", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -87,7 +100,7 @@ useEffect(() => {
   };
 
   fetchUsers();
-}, []);
+}, [token]);
   const [categories, setCategories] = useState([]);
 
   // --- منطق الفلترة ---
@@ -137,6 +150,7 @@ useEffect(() => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         name: newPlace.name,
@@ -267,6 +281,7 @@ useEffect(() => {
                     method: "POST",
                     headers: {
                       "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
                    },
                    body: JSON.stringify({ name }),
                   });
@@ -332,6 +347,7 @@ useEffect(() => {
                     method: "PUT",
                     headers: {
                       "Content-Type": "application/json",
+                      Authorization: `Bearer ${token}`,
                     },
                     body: JSON.stringify({
                       isBlocked: !user.isBlocked,
@@ -392,6 +408,7 @@ useEffect(() => {
                 method: "PUT",
                 headers: {
                   "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
                },
                body: JSON.stringify(permissions),
              }
@@ -955,12 +972,12 @@ const EditMeetupModal = ({ isOpen, onClose, meetup, onCreateNew, onSave }) => {
 
 const RestrictUserModal = ({ isOpen, onClose, user, onSave }) => {
   const [res1, setRes1] = useState(user?.permissions?.createMeetup ?? true);
-  const [res2, setRes2] = useState(user?.permissions?.addOthers ?? true);
+  const [res2, setRes2] = useState(user?.permissions?.joinMeetups ?? true);
 
   useEffect(() => {
     if (user) {
       setRes1(user?.permissions?.createMeetup ?? true);
-      setRes2(user?.permissions?.addOthers ?? true);
+      setRes2(user?.permissions?.joinMeetups ?? true);
    }
   }, [user]);
   return (
@@ -987,7 +1004,7 @@ const RestrictUserModal = ({ isOpen, onClose, user, onSave }) => {
                 </div>
               </div>
             </div>
-            <div className="flex gap-6 p-10 bg-black/20"><button onClick={onClose} className="flex-1 bg-[#ff6b35] py-5 rounded-2xl font-black uppercase">Cancel</button><button onClick={() => onSave(user, { createMeetup: res1, addOthers: res2 })} className="flex-1 bg-[#ff6b35] py-5 rounded-2xl font-black uppercase">Save</button></div>
+            <div className="flex gap-6 p-10 bg-black/20"><button onClick={onClose} className="flex-1 bg-[#ff6b35] py-5 rounded-2xl font-black uppercase">Cancel</button><button onClick={() => onSave(user, { createMeetup: res1, joinMeetups: res2 })} className="flex-1 bg-[#ff6b35] py-5 rounded-2xl font-black uppercase">Save</button></div>
           </motion.div>
         </div>
       )}

@@ -2,8 +2,13 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import Navbar from "./Navbar";
 import axios from "axios";
 import "./MeetupPage.css";
+import { Search } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function MeetupPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   /* =========================
       🧠 STATE & REFS
   ========================= */
@@ -20,32 +25,54 @@ export default function MeetupPage() {
 
   const participantsRef = useRef(null);
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
-  const canCreateMeetup = loggedInUser?.permissions?.createMeetup !== false;
-  const canJoinMeetups = loggedInUser?.permissions?.addOthers !== false;
+  const token = localStorage.getItem("token");
+  const canCreateMeetup =
+  loggedInUser?.permissions?.createMeetup === false ? false : true;
+
+const canJoinMeetups =
+  loggedInUser?.permissions?.joinMeetups === false ? false : true;
 
   /* =========================
       📡 API CALLS
   ========================= */
   const fetchMeetups = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/meetups");
+      const res = await fetch("http://localhost:5000/api/meetups", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       const data = await res.json();
       setMeetups(data);
     } catch (err) { console.error("Fetch error:", err); }
-  }, []);
+  }, [token]);
 
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/users");
+      const res = await axios.get("http://localhost:5000/api/users", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       const others = res.data.filter(u => u.name !== loggedInUser?.name);
       setAllUsers(others);
     } catch (err) { console.error("Error fetching users:", err); }
-  }, [loggedInUser?.name]);
+  }, [loggedInUser?.name, token]);
 
   useEffect(() => { 
     fetchMeetups(); 
     fetchUsers();
-  }, [fetchMeetups, fetchUsers]); 
+  }, [fetchMeetups, fetchUsers]);
+  useEffect(() => {
+  if (location.state?.openCreate && location.state?.place) {
+    setIsCreateModalOpen(true);
+
+    setFormData((prev) => ({
+      ...prev,
+      placeName: location.state.place.name || "",
+    }));
+  }
+}, [location.state]); 
 
   /* =========================
       ⚙️ HANDLERS
@@ -62,25 +89,43 @@ export default function MeetupPage() {
       time: formData.time,
       invitedPeople: formData.invitePeople,
       notes: formData.notes,
-      createdBy: loggedInUser?.name || "Guest",
-      attendees: [loggedInUser?.name || "Host"],
+      createdBy: {
+         id: loggedInUser?.id || loggedInUser?._id,
+         name: loggedInUser?.name || "Guest",
+        },
+      attendees: [
+        {
+          id: loggedInUser?.id || loggedInUser?._id,
+          name: loggedInUser?.name || "Host",
+        },
+      ],
       img: `https://picsum.photos/400/250?random=${Math.random()}`
     };
 
     try {
       const res = await fetch("http://localhost:5000/api/meetups/create", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(newMeetupData),
       });
-      if (res.ok) { 
-        fetchMeetups(); 
-        setIsCreateModalOpen(false);
-        setShowInviteDropdown(false); 
-        setUserSearchTerm(""); 
-        setFormData(emptyForm); 
-        alert("Meetup created and invites sent! ✨");
-      }
+      const data = await res.json();
+
+console.log("RESPONSE:", data);
+
+if (res.ok) {
+  fetchMeetups();
+  setIsCreateModalOpen(false);
+  setShowInviteDropdown(false);
+  setUserSearchTerm("");
+  setFormData(emptyForm);
+
+  alert("Meetup created successfully ✨");
+} else {
+  alert(data.message || "Failed to create meetup");
+}
     } catch (err) { console.error("Save Error", err); }
   };
 
@@ -98,7 +143,12 @@ export default function MeetupPage() {
 
   const handleDeleteMeetup = async (id) => {
     if (!window.confirm("Are you sure you want to cancel this meetup?")) return;
-    const res = await fetch(`http://localhost:5000/api/meetups/${id}`, { method: "DELETE" });
+    const res = await fetch(`http://localhost:5000/api/meetups/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
     if (res.ok) { setSelectedMeetup(null); fetchMeetups(); }
   };
 
@@ -110,8 +160,16 @@ export default function MeetupPage() {
     if (!loggedInUser) return alert("Please login first");
     const res = await fetch(`http://localhost:5000/api/meetups/${id}/join`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userName: loggedInUser.name }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        user: {
+          id: loggedInUser.id || loggedInUser._id,
+          name: loggedInUser.name,
+       },
+      }),
     });
     if (res.ok) {
       alert("Joined successfully! 🎉");
@@ -127,11 +185,12 @@ export default function MeetupPage() {
   ========================= */
   return (
     <div className="app meetup-page-bg">
+      <div className="meetup-navbar-wrapper">
       <Navbar />
-      
-      <div className="search-container-center" style={{ marginTop: "100px" }}>
+      </div>
+      <div className="search-container-center"style={{ marginTop: "100px" }} >
         <div className="search-wrapper-custom">
-          <span className="search-glass-icon">🔍</span>
+          <Search className="search-glass-icon" />
           <input 
             type="text" 
             placeholder="Search by place..." 
@@ -173,14 +232,35 @@ export default function MeetupPage() {
                 <div className="participants-block" ref={participantsRef}>
                   <small>Participants</small>
                   <div className="participants-avatars" onClick={() => setShowParticipants(!showParticipants)}>
-                    {selectedMeetup.attendees.slice(0, 3).map((p, i) => (
-                      <div key={i} className="avatar-circle">{p.charAt(0)}</div>
-                    ))}
+                    {selectedMeetup.attendees.slice(0, 3).map((p, i) => {
+                      const name = typeof p === "string" ? p : p.name;
+
+                      return (
+                        <div key={i} className="avatar-circle">
+                        {name?.charAt(0)}
+                       </div>
+                      );
+                    })}
                     {selectedMeetup.attendees.length > 3 && <div className="avatar-circle">+{selectedMeetup.attendees.length - 3}</div>}
                   </div>
                   {showParticipants && (
                     <div className="participants-dropdown">
-                      {selectedMeetup.attendees.map((p, i) => <div key={i} className="participant-row">{p}</div>)}
+                      {selectedMeetup.attendees.map((p, i) => {
+                        const name = typeof p === "string" ? p : p.name;
+                        const id = typeof p === "string" ? null : p.id;
+                        return (
+                          <div
+                            key={i}
+                            className="participant-row"
+                            onClick={() => {
+                              if (id) navigate(`/profile/${id}`);
+                            }}
+                            style={{ cursor: id ? "pointer" : "default" }}
+                          >
+                            {name}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -188,20 +268,28 @@ export default function MeetupPage() {
 
               <div className="popup-action-btns">
                 <button className="btn-cancel-popup" onClick={() => setSelectedMeetup(null)}>Close</button>
-                {selectedMeetup.createdBy === loggedInUser?.name ? (
+                {selectedMeetup.createdBy?.id === (loggedInUser?.id || loggedInUser?._id) ? (
                   <button className="btn-delete-meetup" onClick={() => handleDeleteMeetup(selectedMeetup._id)}>Cancel Meetup</button>
                 ) : (
                   <button 
                     className="btn-send-request" 
                     onClick={() => handleJoinMeetup(selectedMeetup._id)}
                     disabled={
-                      selectedMeetup.attendees.includes(loggedInUser?.name) ||
+                      selectedMeetup.attendees.some((p) =>
+                        typeof p === "string"
+                          ? false
+                          : p.id === (loggedInUser?.id || loggedInUser?._id)
+                      ) ||
                       !canJoinMeetups
                     }
                   >
                     {!canJoinMeetups
                       ? "Restricted"
-                      : selectedMeetup.attendees.includes(loggedInUser?.name)
+                      : selectedMeetup.attendees.some((p) =>
+                          typeof p === "string"
+                            ? false
+                            : p.id === (loggedInUser?.id || loggedInUser?._id)
+                       )
                       ? "Joined ✓"
                       : "Join Meetup"}
                   </button>
@@ -306,7 +394,7 @@ export default function MeetupPage() {
       )}
       
       <button
-        className="floating-create-btn"
+       className="floating-create-btn"
         onClick={() => {
           if (!canCreateMeetup) {
             alert("You are not allowed to create meetups");

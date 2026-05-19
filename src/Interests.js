@@ -52,8 +52,6 @@ function Interests() {
       localStorage.setItem("interests", JSON.stringify(selected));
       localStorage.setItem("user", JSON.stringify({ ...storedUser, ...data.user, interests: selected }));
       localStorage.setItem("hasInterests", "true");
-
-      alert("Interests updated! ✨");
       navigate(location.state?.fromProfile ? "/profile" : "/home");
     } catch (err) {
       alert("Server connection error!");

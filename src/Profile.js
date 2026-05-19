@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios"; 
 import Navbar from "./Navbar";
+import { auth } from "./firebase";
+import { signOut, deleteUser } from "firebase/auth";
+import { Menu } from "lucide-react";
 
 function Profile() {
   const navigate = useNavigate();
+  const { id } = useParams();
   const [isEditing, setIsEditing] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(""); 
   const [hostedCount, setHostedCount] = useState(0);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const [user, setUser] = useState({
     _id: "",
@@ -20,6 +25,7 @@ function Profile() {
     interests: [],
     savedPlaces: []
   });
+  const token = localStorage.getItem("token");
 
   useEffect(() => {
     const fetchProfileAndStats = async () => {
@@ -31,11 +37,11 @@ function Profile() {
         }
 
         const storedUser = JSON.parse(storedUserData);
-        if (storedUser) {
+        if (storedUser && !id) {
           setUser(prev => ({ ...prev, ...storedUser }));
         }
 
-        const userId = storedUser?.id || storedUser?._id;
+        const userId = id || storedUser?.id || storedUser?._id;
         const userName = storedUser?.name;
         
         if (!userId || userId === "undefined") {
@@ -43,14 +49,31 @@ function Profile() {
         }
 
         // 🛠️ تم التعديل هنا لاستخدام axios مباشرة
-        const res = await axios.get(`http://localhost:5000/api/users/profile/${userId}`);
+        const res = await axios.get(
+          `http://localhost:5000/api/users/profile/${userId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
         if (res.data) {
           setUser(res.data);
-          localStorage.setItem("user", JSON.stringify(res.data));
+          // لا نحدث localStorage إلا إذا كان هذا بروفايلي أنا
+          if (!id) {
+            localStorage.setItem("user", JSON.stringify(res.data));
+          }
         }
 
         // 🛠️ تم التعديل هنا لاستخدام axios مباشرة
-        const meetupsRes = await axios.get("http://localhost:5000/api/meetups");
+        const meetupsRes = await axios.get(
+          "http://localhost:5000/api/meetups",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
         if (meetupsRes.data && userName) {
           const myHostedMeetups = meetupsRes.data.filter(m => m.createdBy === userName);
           setHostedCount(myHostedMeetups.length);
@@ -62,8 +85,11 @@ function Profile() {
     };
     
     fetchProfileAndStats();
-  }, [navigate]);
+  }, [navigate, id, token]);
+  const loggedUser = JSON.parse(localStorage.getItem("user"));
 
+  const isMyProfile =
+   !id || id === (loggedUser?.id || loggedUser?._id);
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -85,9 +111,17 @@ function Profile() {
       const updatedPlaces = user.savedPlaces.filter(p => p._id !== placeId);
       
       // 🛠️ تم التعديل هنا لاستخدام axios مباشرة
-      const res = await axios.put(`http://localhost:5000/api/users/profile/update/${user._id}`, {
-        savedPlaces: updatedPlaces
-      });
+      const res = await axios.put(
+        `http://localhost:5000/api/users/profile/update/${user._id}`,
+        {
+          savedPlaces: updatedPlaces
+        },
+        {
+           headers: {
+              Authorization: `Bearer ${token}`,
+           },
+        }
+      );
 
       if (res.data) {
         setUser(prev => ({ ...prev, savedPlaces: updatedPlaces }));
@@ -118,7 +152,12 @@ function Profile() {
       const res = await axios.put(
         `http://localhost:5000/api/users/profile/update/${user._id}`, 
         formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
 
       if (res.data.user) {
@@ -147,9 +186,96 @@ function Profile() {
   const hasValidImage = displayImage && 
                         displayImage.trim() !== "" && 
                         !displayImage.includes("unsplash.com");
+  
+  const [menuOpen, setMenuOpen] = useState(false);
+
+const handleLogout = async () => {
+  await signOut(auth);
+  localStorage.clear();
+  navigate("/");
+};
+
+const handleDeleteAccount = async () => {
+  
+
+  try {
+    await axios.delete(
+      `http://localhost:5000/api/users/${user._id}`,
+      { 
+        headers: {
+           Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (auth.currentUser) {
+      await deleteUser(auth.currentUser);
+    }
+
+    localStorage.clear();
+    navigate("/");
+  } catch (err) {
+    console.error(err);
+    alert("Failed to delete account.");
+  }
+};
 
   return (
     <div style={containerStyle}>
+      {isMyProfile && (
+        <div style={{ position: "absolute", top: "25px", right: "25px", zIndex: 100 }}>
+  <button
+    onClick={() => setMenuOpen(!menuOpen)}
+    style={{
+      background: "rgba(255,255,255,0.08)",
+      border: "1px solid rgba(255,255,255,0.12)",
+      borderRadius: "12px",
+      width: "42px",
+      height: "42px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      cursor: "pointer",
+      color: "white",
+    }}
+  
+  >
+    <Menu size={20} />
+  </button>
+
+  {menuOpen && (
+    <div
+      style={{
+        position: "absolute",
+        top: "50px",
+        right: 0,
+        background: "#1e1b4b",
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: "16px",
+        overflow: "hidden",
+        minWidth: "180px",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+      }}
+    >
+      <button onClick={handleLogout} style={menuItemStyle}onMouseEnter={(e) => e.target.style.background = "rgba(255,255,255,0.08)"}onMouseLeave={(e) => e.target.style.background = "transparent"}>
+        Logout 
+      </button>
+
+      <button
+        onClick={() => setShowDeleteModal(true)}
+        style={{
+          ...menuItemStyle,
+          color: "#ff6b6b",
+        }}
+        onMouseEnter={(e) => e.target.style.background = "rgba(255,255,255,0.08)"}
+        onMouseLeave={(e) => e.target.style.background = "transparent"}
+      >
+        Delete Account 
+      </button>
+    </div>
+  )}
+</div>
+  )}
       <div style={{ marginBottom: "20px" }}>
         <Navbar />
       </div>
@@ -203,11 +329,15 @@ function Profile() {
             ) : (
               <>
                 <h2 style={{ marginBottom: "8px", fontWeight: "700" }}>{user.name}</h2>
-                <p style={{ color: "rgba(255,255,255,0.7)", margin: "0 0 10px 0" }}>📍 {user.location}</p>
+                <p style={{ color: "rgba(255,255,255,0.7)", margin: "0 0 10px 0" }}> {user.location ? `📍 ${user.location}` : "No location added yet"}</p>
                 <p style={joinedTextStyle}>Joined {user.joined || "January 2022"}</p>
                 
-                <button onClick={() => setIsEditing(true)} style={editBtnStyle}>Edit Profile ✏️</button>
-                <button onClick={() => navigate("/interests")} style={interestBtnStyle}>Edit Interests 🎯</button>
+                {isMyProfile && (
+                  <>
+                    <button onClick={() => setIsEditing(true)} style={editBtnStyle}>Edit Profile ✏️</button>
+                    <button onClick={() => navigate("/interests")} style={interestBtnStyle}>Edit Interests 🎯</button>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -237,20 +367,23 @@ function Profile() {
             </div>
           </SectionBox>
 
-          <SectionBox title="Saved Places ❤️">
+          {isMyProfile && (
+            <SectionBox title="Saved Places ❤️">
             <div style={placesGrid}>
               {user.savedPlaces && user.savedPlaces.length > 0 ? (
                 user.savedPlaces.map((place, i) => (
                   <div key={i} style={placeCardStyle}>
                     <div style={{ position: "relative" }}>
                       <img src={place.image} alt={place.name} style={placeImgStyle} />
-                      <button 
-                        onClick={() => removePlace(place._id)} 
-                        style={removeBtnStyle}
-                        title="Remove Place"
-                      >
-                        ✕
-                      </button>
+                      {isMyProfile && (
+                        <button 
+                          onClick={() => removePlace(place._id)} 
+                          style={removeBtnStyle}
+                          title="Remove Place"
+                        >
+                          ✕
+                       </button>
+                      )}
                     </div>
                     <div style={{ padding: "12px" }}>
                       <h4 style={{ margin: "0 0 4px 0", color: "#fff" }}>{place.name}</h4>
@@ -263,9 +396,31 @@ function Profile() {
               )}
             </div>
           </SectionBox>
+          )}
         </div>
       </div>
+      
+      {showDeleteModal && (
+  <div style={modalOverlayStyle}>
+    <div style={deleteModalStyle}>
+      <h2>Delete Account?</h2>
+      <p> Deleting your account will permanently remove
+          your profile, saved places, meetups, and all your data.</p>
+
+      <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
+        <button onClick={() => setShowDeleteModal(false)} style={cancelDeleteBtnStyle} onMouseEnter={(e) => {e.target.style.background = "rgba(255,255,255,0.15)";}}onMouseLeave={(e) => {e.target.style.background = "rgba(255,255,255,0.08)";}}>
+          Cancel
+        </button>
+
+        <button onClick={handleDeleteAccount} style={confirmDeleteBtnStyle}onMouseEnter={(e) => { e.target.style.background = "#ef4444";}}onMouseLeave={(e) => {e.target.style.background = "#dc2626";}}>
+          Delete
+        </button>
+      </div>
     </div>
+  </div>
+)}
+    </div>
+  
   );
 }
 
@@ -323,5 +478,58 @@ const placeCardStyle = { background: "rgba(0, 0, 0, 0.2)", borderRadius: "16px",
 const placeImgStyle = { width: "100%", height: "130px", objectFit: "cover" };
 const placeLocStyle = { color: "rgba(255,255,255,0.6)", fontSize: "12px", margin: 0 };
 const removeBtnStyle = { position: "absolute", top: "8px", right: "8px", background: "rgba(255, 50, 50, 0.8)", color: "white", border: "none", borderRadius: "50%", width: "26px", height: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", boxShadow: "0 2px 5px rgba(0,0,0,0.3)", zIndex: 2, transition: "all 0.2s ease" };
+const menuItemStyle = {
+  width: "100%",
+  padding: "14px 18px",
+  background: "transparent",
+  border: "none",
+  color: "white",
+  textAlign: "left",
+  cursor: "pointer",
+  fontSize: "14px",
+  transition: "all 0.2s ease",
+};
+const modalOverlayStyle = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.75)",
+  backdropFilter: "blur(8px)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 9999,
+};
 
+const deleteModalStyle = {
+  width: "90%",
+  maxWidth: "420px",
+  background: "#1e1b4b",
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: "22px",
+  padding: "28px",
+  color: "white",
+  textAlign: "center",
+  boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
+};
+
+const cancelDeleteBtnStyle = {
+  flex: 1,
+  padding: "12px",
+  borderRadius: "12px",
+  border: "1px solid rgba(255,255,255,0.15)",
+  background: "rgba(255,255,255,0.08)",
+  color: "white",
+  cursor: "pointer",
+};
+
+const confirmDeleteBtnStyle = {
+  flex: 1,
+  padding: "12px",
+  borderRadius: "12px",
+  border: "none",
+  background: "#dc2626",
+  color: "white",
+  cursor: "pointer",
+  fontWeight: "bold",
+};
 export default Profile;

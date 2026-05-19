@@ -1,15 +1,15 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { auth } from "./firebase";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 
-import {
-  signInWithEmailAndPassword,
-} from "firebase/auth";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  
 
   const navigate = useNavigate();
 
@@ -17,24 +17,12 @@ export default function LoginPage() {
     e.preventDefault();
 
     // ✅ validation
-    if (!email || !password) {
+    if (!identifier || !password) {
       setError("Please fill all fields");
       return;
     }
 
-    if (!email.includes("@")) {
-      setError("Invalid email format");
-      return;
-    }
 
-    // ✅ منطق تسجيل دخول الأدمن
-    if (email === "admin@kashta.com" && password === "admin123") {
-      setError("");
-      // تخزين بيانات الأدمن لتمكين الـ ProtectedRoute من التعرف عليه
-      localStorage.setItem("user", JSON.stringify({ email: email, role: "admin" }));
-      navigate("/admin");
-      return;
-    }
 
 
     try {
@@ -44,12 +32,14 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email,
+          identifier,
           password,
         }),
       });
 
       const data = await res.json();
+      console.log("LOGIN DATA:", data);
+      console.log("USER ROLE:", data.user?.role);
 
       if (!res.ok) {
         setError(data.message || "Login failed");
@@ -67,81 +57,39 @@ export default function LoginPage() {
         ...data.user,
         id: data.user._id || data.user.id // التوافق مع backend بوجود _id أو id
       };
-
+      
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(userToStore));
-
       setError("");
-      navigate("/home");
+      if (data.user.role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate("/home");
+      }
     } catch (err) {
       setError("Server error");
     }
-
-  try {
-  // 🔥 تسجيل الدخول عبر Firebase
-const userCredential = await signInWithEmailAndPassword(
-  auth,
-  email,
-  password
-);
-
-const user = userCredential.user;
-
-// 🔥 تحديث بيانات التحقق
-await user.reload();
-
-if (!user.emailVerified) {
-  setError("Please verify your email first 📩");
-  return;
-}
-
-// 🔥 تسجيل الدخول في backend
-const res = await fetch("http://localhost:5000/api/auth/login", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    email,
-    password,
-  }),
-});
-
-const data = await res.json();
-
-if (!res.ok) {
-  setError(data.message || "Login failed");
-  return;
-}
-const userToStore = {
-  ...data.user,
-  id: data.user._id || data.user.id,
-};
-
-localStorage.setItem("token", data.token);
-localStorage.setItem("user", JSON.stringify(userToStore));
-
-
-setError("");
-
-if (!data.user.interests || data.user.interests.length === 0) {
-  navigate("/interests");
-} else {
-  navigate("/home");
-}
-} catch (err) {
-  if (err.code === "auth/invalid-credential") {
-  setError("Invalid email or password");
-} else {
-  setError(err.message);
-}
-}
 
   };
 
   const handleSignup = () => {
     navigate("/signup");
   };
+  const handleForgotPassword = async () => {
+  try {
+    if (!identifier) {
+      setError("Enter your email first");
+      return;
+    }
+
+    await sendPasswordResetEmail(auth, identifier);
+
+    setMessage("Password reset email sent 📩");
+    setError("");
+  } catch (err) {
+    setError("Failed to send reset email");
+  }
+};
 
   return (
     <div
@@ -194,10 +142,10 @@ if (!data.user.interests || data.user.interests.length === 0) {
 
           <form onSubmit={handleLogin}>
             <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="Email or Username"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               style={{
                 width: "100%",
                 padding: "12px",
@@ -224,11 +172,28 @@ if (!data.user.interests || data.user.interests.length === 0) {
                 color: "white",
               }}
             />
+            <p
+              onClick={handleForgotPassword}
+              style={{
+                color: "#c084fc",
+                marginTop: "10px",
+                cursor: "pointer",
+                fontSize: "14px",
+                textAlign: "right",
+              }}
+            >
+              Forgot Password?
+            </p>
 
             {error && (
               <p style={{ color: "#f87171", marginTop: "10px", fontSize: "14px" }}>
                 {error}
               </p>
+            )}
+            {message && (
+              <p style={{ color: "#4ade80", marginTop: "10px", fontSize: "14px" }}>
+                {message}
+             </p>
             )}
 
             <button
