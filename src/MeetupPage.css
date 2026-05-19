@@ -15,7 +15,11 @@
   display: flex;
   justify-content: center;
   gap: 25px;
-  margin: 15px 0;
+  margin: 40px 0 15px;
+}
+.meetup-navbar-wrapper {
+  margin-top: 25px;
+  margin-bottom: -20px;
 }
 
 .nav-item {
@@ -37,47 +41,49 @@
 .search-container-center {
   display: flex;
   justify-content: center;
-  margin: 20px 0;
-  padding: 0 20px;
-}
-
-.search-container-center input {
-  width: 500px !important;
-  border-radius: 12px !important;
-  background: rgba(255, 255, 255, 0.1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  color: white !important;
-  padding: 12px 20px !important;
+  margin-bottom: 30px;
 }
 
 .search-wrapper-custom {
   position: relative;
-  width: 100%;
-  max-width: 500px;
+  width: 720px;
+  top: -40px;
 }
 
 .search-glass-icon {
   position: absolute;
-  left: 15px;
+  left: 22px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 1.2rem;
-  opacity: 0.6;
+  width: 18px;
+  height: 18px;
+  color: rgba(255,255,255,0.7);
+  z-index: 2;
+  pointer-events: none;
 }
 
 .main-search-input {
   width: 100%;
-  padding: 15px 15px 15px 45px;
-  border-radius: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.1);
+  height: 64px;
+  padding: 0 24px 0 58px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(18px);
   color: white;
+  font-size: 17px;
   outline: none;
-  backdrop-filter: blur(10px);
+  transition: all 0.25s ease;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+}
+
+.main-search-input:focus {
+  border-color: rgba(255,138,0,0.7);
+  box-shadow: 0 0 0 4px rgba(255,138,0,0.15);
 }
 
 .main-search-input::placeholder {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255,255,255,0.55);
 }
 
 /* =========================
@@ -575,6 +581,7 @@
   flex-direction: column;
   margin: 0;
   padding: 0;
+}
 
   /* ==========================================================================
    💎 PREMIUM MEETUP INVITE STYLES (DARK LUXURY THEME)
@@ -1033,5 +1040,4 @@
 @keyframes fadeInDropdown {
   from { opacity: 0; transform: translateY(-5px); }
   to { opacity: 1; transform: translateY(0); }
-}
 }

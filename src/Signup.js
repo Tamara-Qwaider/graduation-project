@@ -19,6 +19,7 @@ export default function SignupPage() {
 
     const name = e.target.name.value;
     const email = e.target.email.value;
+    const cleanEmail = email.toLowerCase();
     const password = e.target.password.value;
     const confirmPassword = e.target.confirmPassword.value;
 
@@ -26,16 +27,39 @@ export default function SignupPage() {
       setError("Please fill all fields");
       return;
     }
-
-    if (!email.includes("@")) {
-      setError("Invalid email format");
+    if (name.length < 3) {
+      setError("Username must be at least 3 characters");
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (name.length > 20) {
+      setError("Username must be less than 20 characters");
       return;
-   }
+    }
+
+    if (!/^[a-zA-Z0-9_ ]+$/.test(name)) {
+      setError("Username can only contain letters, numbers, spaces, and _");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+     setError("Invalid email format");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      setError("Password must contain at least one uppercase letter");
+      return;
+    }
+
+    if (!/[0-9]/.test(password)) {
+      setError("Password must contain at least one number");
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Passwords do not match");
@@ -55,7 +79,7 @@ export default function SignupPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: cleanEmail }),
       });
 
       const res = await fetch("http://localhost:5000/api/auth/login", {
@@ -64,9 +88,10 @@ export default function SignupPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email,
+          identifier: cleanEmail,
           password,
-        }),
+        })
+    
       });
 
       const data = await res.json();
@@ -96,7 +121,7 @@ export default function SignupPage() {
   // إنشاء الحساب لأول مرة
   const userCredential = await createUserWithEmailAndPassword(
     auth,
-    email,
+    cleanEmail,
     password
   );
 
@@ -111,7 +136,7 @@ export default function SignupPage() {
     },
     body: JSON.stringify({
       name,
-      email,
+      email: cleanEmail,
       password,
       interests: [],
       firebaseUID: userCredential.user.uid,
@@ -209,11 +234,11 @@ export default function SignupPage() {
           <form onSubmit={handleSignup}>
             
             <div style={{ marginBottom: "15px" }}>
-              <label style={{ color: "rgba(255,255,255,0.8)" }}>Full Name</label>
+              <label style={{ color: "rgba(255,255,255,0.8)" }}>Username</label>
               <input
                 name="name"
                 type="text"
-                placeholder="John Doe"
+                placeholder="Enter your username"
                 style={{
                   width: "100%",
                   padding: "12px",

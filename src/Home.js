@@ -7,11 +7,15 @@ import "./HomePage.css";
 export default function Home() {
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
+  const [tripPlan, setTripPlan] = useState("");
+  const [showTripPlan, setShowTripPlan] = useState(false);
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [aiLoading, setAiLoading] = useState(false);
   
 
   const [placesData, setPlacesData] = useState([]);
+  const [aiRecommendations, setAiRecommendations] = useState([]);
   
   // الحفاظ على حالة الأماكن من كائن المستخدم
   const [savedPlaces, setSavedPlaces] = useState(() => {
@@ -20,6 +24,33 @@ export default function Home() {
   });
 
   const navigate = useNavigate();
+  const token = localStorage.getItem("token");
+  const generateTripPlan = async () => {
+  try {
+    setAiLoading(true);
+    const user = JSON.parse(localStorage.getItem("user"));
+
+    const res = await fetch("http://localhost:5000/api/ai/plan-trip", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user,
+        places: placesData,
+      }),
+    });
+
+    const data = await res.json();
+
+    setTripPlan(data.tripPlan);
+    setShowTripPlan(true);
+  } catch (err) {
+    console.error(err);
+  }finally {
+    setAiLoading(false);
+  }
+};
 
   useEffect(() => {
     const fetchPlaces = async () => {
@@ -31,6 +62,57 @@ export default function Home() {
     };
     fetchPlaces();
   }, []);
+  useEffect(() => {
+  // eslint-disable-next-line no-unused-vars
+  const fetchAIRecommendations = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem("user"));
+
+      if (!user || placesData.length === 0) return;
+
+      const res = await fetch("http://localhost:5000/api/ai/recommendations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user: {
+            ...user,
+            viewedPlaces:
+              JSON.parse(localStorage.getItem("viewedPlaces")) || [],
+          },
+          places: placesData,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.recommendations) {
+        const merged = data.recommendations
+          .map((rec) => {
+            const originalPlace = placesData.find(
+              (p) => (p._id || p.id) === rec.placeId
+            );
+
+            if (!originalPlace) return null;
+
+            return {
+              ...originalPlace,
+              aiReason: rec.aiReason,
+              aiMatchScore: rec.matchScore,
+            };
+          })
+          .filter(Boolean);
+
+        setAiRecommendations(merged);
+      }
+    } catch (err) {
+      console.error("AI Recommendation Error:", err);
+    }
+  };
+
+  //fetchAIRecommendations();
+}, [placesData]);
 
   // --- دالة الحفظ المحدثة (ترسل الإضافة فقط) ---
   const toggleSave = async (place) => {
@@ -57,7 +139,10 @@ export default function Home() {
     try {
       const res = await fetch(`http://localhost:5000/api/users/profile/update/${userId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+         "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(payload),
       });
 
@@ -76,6 +161,14 @@ export default function Home() {
      <div
        onClick={() => {
           setSelected(item);
+          const viewed = JSON.parse(localStorage.getItem("viewedPlaces")) || [];
+
+          const updatedViewed = [
+            item,
+            ...viewed.filter((p) => (p._id || p.id) !== (item._id || item.id)),
+          ].slice(0, 10);
+
+          localStorage.setItem("viewedPlaces", JSON.stringify(updatedViewed));
           setCurrentImageIndex(0);
         }}
         className="home-card"
@@ -85,6 +178,17 @@ export default function Home() {
         <h3>{item.name}</h3>
         <p>{item.location}</p>
         <div className="home-rating"><Star size={14} /> {item.rating}</div>
+        {item.recommendationReason && (
+          <p className="recommendation-reason">
+            ✨ {item.recommendationReason}
+          </p>
+        )}
+
+        {item.aiReason && (
+          <p className="recommendation-reason">
+            🤖 {item.aiReason}
+         </p>
+        )}
       </div>
     </div>
   );
@@ -125,16 +229,103 @@ export default function Home() {
   };
 
   // معالجة الفئات والتوصيات
-  const categories = [...new Set(placesData.map((p) => p.category))];
-  const userInterests = JSON.parse(localStorage.getItem("interests")) || [];
-  const cleanText = (text) => text.toLowerCase().replace(/[^\w\s]/g, "").trim();
-  const recommendedPlaces = placesData.filter((place) =>
-    userInterests.some((interest) => {
-      const cleanInterest = cleanText(interest);
-      const cleanCategory = cleanText(place.category);
-      return cleanInterest.includes(cleanCategory) || cleanCategory.includes(cleanInterest.split(" ")[0]);
-    })
-  );
+ const categories = [
+  ...new Set(
+    placesData
+      .map((p) => p.category)
+      .filter((cat) => cat !== "Suggestions")
+  ),
+];
+
+const loggedUser = JSON.parse(localStorage.getItem("user"));
+const userInterests = loggedUser?.interests || [];
+
+const cleanText = (text = "") =>
+  text.toLowerCase().replace(/[^\w\s]/g, "").trim();
+
+const getRecommendationScore = (place) => {
+  let score = 0;
+
+  const placeCategory = cleanText(place.category);
+  const placeName = cleanText(place.name);
+  const placeDescription = cleanText(place.description);
+
+  userInterests.forEach((interest) => {
+    const cleanInterest = cleanText(interest);
+
+    if (
+      placeCategory.includes(cleanInterest) ||
+      cleanInterest.includes(placeCategory)
+    ) {
+      score += 4;
+    }
+
+    if (placeName.includes(cleanInterest)) {
+      score += 2;
+    }
+
+    if (placeDescription.includes(cleanInterest)) {
+      score += 1;
+    }
+  });
+
+  if ((place.rating || 0) >= 4.5) {
+    score += 2;
+  }
+
+  if ((place.rating || 0) >= 4) {
+    score += 1;
+  }
+
+  return score;
+};
+
+const getRecommendationReason = (place) => {
+  const placeCategory = cleanText(place.category);
+  const placeName = cleanText(place.name);
+  const placeDescription = cleanText(place.description);
+
+  const matchedInterest = userInterests.find((interest) => {
+    const cleanInterest = cleanText(interest);
+
+    return (
+      placeCategory.includes(cleanInterest) ||
+      cleanInterest.includes(placeCategory) ||
+      placeName.includes(cleanInterest) ||
+      placeDescription.includes(cleanInterest)
+    );
+  });
+
+  if (matchedInterest) {
+    return `Because you like ${matchedInterest}`;
+  }
+
+  if ((place.rating || 0) >= 4.5) {
+    return "Top rated place";
+  }
+
+  return "Popular recommendation";
+};
+
+const recommendedPlaces = placesData
+  .map((place) => ({
+    ...place,
+    recommendationScore: getRecommendationScore(place),
+    recommendationReason: getRecommendationReason(place),
+  }))
+  .filter((place) =>
+    userInterests.length > 0
+      ? place.recommendationScore > 0
+      : (place.rating || 0) >= 4
+  )
+  .sort((a, b) => {
+    if (b.recommendationScore !== a.recommendationScore) {
+      return b.recommendationScore - a.recommendationScore;
+    }
+
+    return (b.rating || 0) - (a.rating || 0);
+  })
+  .slice(0, 8);
 
   return (
     <div className="home-page-bg" style={{ position: "relative" }}>
@@ -146,9 +337,29 @@ export default function Home() {
         .home-save-btn.saved { color: #ff8a00 !important; fill: #ff8a00; }
       `}</style>
 
-      <h1 className="vibe-top-header">VIBE</h1>
+      <div className="logo"></div>
       <div className="content-body">
         <Navbar />
+        <div className="ai-top-bar">
+          <div className="ai-plan-link" onClick={() => {if (!aiLoading) generateTripPlan();}}>
+            <span className="ai-icon">✦</span>
+            <span>
+              {aiLoading ? "Generating..." : "AI Planner"}
+            </span>
+          </div>
+        </div>
+        {showTripPlan && tripPlan && (
+          <div className="ai-trip-box">
+             <button
+                className="close-ai-box"
+                onClick={() => setShowTripPlan(false)}
+              >
+                ✕
+              </button>
+            <h2>🤖 AI Trip Plan</h2>
+            <p>{tripPlan}</p>
+          </div>
+        )}
         <div className="home-search-wrapper">
           <div className="home-search-box">
             <Search className="home-search-icon" />
@@ -156,8 +367,13 @@ export default function Home() {
           </div>
         </div>
 
-        {recommendedPlaces.length > 0 && (
-          <Section title="Recommended For You" items={recommendedPlaces.filter(p => `${p.name} ${p.location}`.toLowerCase().includes(search.toLowerCase()))} />
+        {(aiRecommendations.length > 0 ? aiRecommendations : recommendedPlaces).length > 0 && (
+          <Section
+            title="Recommended For You"
+            items={(aiRecommendations.length > 0 ? aiRecommendations : recommendedPlaces).filter((p) =>
+              `${p.name} ${p.location}`.toLowerCase().includes(search.toLowerCase())
+            )}
+         />
         )}
 
         {categories.map((cat) => (

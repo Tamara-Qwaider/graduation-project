@@ -42,6 +42,14 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/profile/:id"
+        element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/meetups"
@@ -64,7 +72,7 @@ function App() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute adminOnly={true}>
             <AdminPage />
           </ProtectedRoute>
         }
