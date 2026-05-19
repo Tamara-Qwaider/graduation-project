@@ -25,77 +25,94 @@ export default function AdminPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  useEffect(() => {
-  const fetchCategories = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/categories");
-      const data = await res.json();
-      setCategories(data);
-    } catch (err) {
-      console.log("Error fetching categories");
-    }
-  };
 
-  fetchCategories();
-}, []);
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/categories");
+        const data = await res.json();
+        setCategories(data);
+      } catch (err) {
+        console.log("Error fetching categories");
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   // --- البيانات ---
   const [places, setPlaces] = useState([]);
+
   useEffect(() => {
-  const fetchPlaces = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/places");
-      const data = await res.json();
+    const fetchPlaces = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/places");
+        const data = await res.json();
 
-      if (!res.ok) {
-        console.log(data.message || "Failed to fetch places");
-        return;
+        if (!res.ok) {
+          console.log(data.message || "Failed to fetch places");
+          return;
+        }
+
+        setPlaces(data);
+      } catch (err) {
+        console.log("Error fetching places", err);
       }
+    };
 
-      setPlaces(data);
+    fetchPlaces();
+  }, []);
+
+  // ✨ تعديل: جلب الـ Meetups حية من الباك إند بدلاً من المصفوفة الوهمية القديمة
+  const [meetups, setMeetups] = useState([]);
+
+  const fetchMeetups = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/meetups");
+      const data = await res.json();
+      if (res.ok) setMeetups(data);
     } catch (err) {
-      console.log("Error fetching places", err);
+      console.log("Error fetching meetups", err);
     }
   };
 
-  fetchPlaces();
-}, []);
-
-  const [meetups, setMeetups] = useState([
-    { id: 1, title: "Tech Networking Breakfast", loc: "The Urban Cafe", time: "April 22, 2026 • 9:00 AM", p: 3 },
-    { id: 2, title: "Design Thinking Workshop", loc: "Innovation Hub", time: "April 25, 2026 • 2:00 PM", p: 3 },
-    { id: 3, title: "Community Yoga Session", loc: "Central Park Plaza", time: "April 28, 2026 • 7:00 AM", p: 2 },
-  ]);
+  useEffect(() => {
+    fetchMeetups();
+  }, []);
 
   const [users, setUsers] = useState([]);
 
-useEffect(() => {
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch("http://localhost:5000/api/users");
-      const data = await res.json();
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/users");
+        const data = await res.json();
 
-      if (!res.ok) {
-        alert(data.message || "Failed to fetch users");
-        return;
+        if (!res.ok) {
+          alert(data.message || "Failed to fetch users");
+          return;
+        }
+
+        setUsers(data);
+      } catch (err) {
+        alert("Server error");
       }
+    };
 
-      setUsers(data);
-    } catch (err) {
-      alert("Server error");
-    }
-  };
+    fetchUsers();
+  }, []);
 
-  fetchUsers();
-}, []);
   const [categories, setCategories] = useState([]);
 
   // --- منطق الفلترة ---
   const filteredPlaces = places.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-  const filteredMeetups = meetups.filter(m => m.title.toLowerCase().includes(searchTerm.toLowerCase()));
+  
+  // تعديل: الفلترة تدعم الـ title الحقيقي من قاعدة البيانات
+  const filteredMeetups = meetups.filter(m => (m.title || "").toLowerCase().includes(searchTerm.toLowerCase()));
+  
   const filteredUsers = users.filter((u) =>
-  (u.name || "").toLowerCase().includes(searchTerm.toLowerCase())
- );
+    (u.name || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   // --- States للمودلز ---
   const [isEditMeetupOpen, setIsEditMeetupOpen] = useState(false);
@@ -110,58 +127,129 @@ useEffect(() => {
     setSearchTerm('');
   };
 
-  // دوال الإضافة والتعديل
-  const handleCreateMeetup = (newMeetup) => {
-    setMeetups([...meetups, { id: Date.now(), ...newMeetup }]);
-    setIsCreateMeetupOpen(false);
+  // ✨ تعديل: دالة إنشاء Meetup الحقيقية وإرسالها للباك إند
+  const handleCreateMeetup = async (newMeetup) => {
+    const loggedInUser = JSON.parse(localStorage.getItem("user"));
+    
+    const meetupData = {
+      title: newMeetup.title,
+      location: newMeetup.loc,
+      date: newMeetup.date || new Date().toISOString().split('T')[0], 
+      time: newMeetup.time || "12:00",
+      maxParticipants: Number(newMeetup.p) || 10,
+      createdBy: loggedInUser?.name || "Admin",
+      attendees: [loggedInUser?.name || "Admin"], // الآدمن يسجل كأول الحاضرين تلقائياً
+      notes: newMeetup.notes || "Created by Admin",
+      img: `https://picsum.photos/400/250?random=${Math.random()}`
+    };
+
+    try {
+      const res = await fetch("http://localhost:5000/api/meetups/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(meetupData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message || "Failed to create meetup");
+        return;
+      }
+
+      fetchMeetups(); // تحديث القائمة الحية فوراً
+      setIsCreateMeetupOpen(false);
+      alert("Meetup created successfully and published! 🚀");
+    } catch (err) {
+      alert("Server error while creating meetup");
+    }
   };
 
-  const handleUpdateMeetup = (updatedMeetup) => {
-    setMeetups(meetups.map(m => m.id === updatedMeetup.id ? updatedMeetup : m));
-    setIsEditMeetupOpen(false);
+  // ✨ تعديل: دالة تعديل الـ Meetup وربطها بالباك إند
+  const handleUpdateMeetup = async (updatedMeetup) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/meetups/${updatedMeetup._id || updatedMeetup.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: updatedMeetup.title,
+          location: updatedMeetup.loc || updatedMeetup.location,
+          date: updatedMeetup.date,
+          time: updatedMeetup.time,
+          maxParticipants: Number(updatedMeetup.maxParticipants || updatedMeetup.p)
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || "Failed to update meetup");
+        return;
+      }
+
+      fetchMeetups(); // تحديث القائمة الحية فوراً
+      setIsEditMeetupOpen(false);
+      alert("Meetup updated successfully! ✏️");
+    } catch (err) {
+      alert("Server error while updating meetup");
+    }
+  };
+
+  // ✨ تعديل: دالة حذف الـ Meetup الحقيقية من قاعدة البيانات
+  const handleDeleteMeetup = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this meetup?")) return;
+    try {
+      const res = await fetch(`http://localhost:5000/api/meetups/${id}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        fetchMeetups(); // إعادة جلب البيانات لتحديث الشاشة فوراً
+        alert("Meetup deleted! 🗑️");
+      } else {
+        alert("Failed to delete meetup");
+      }
+    } catch (err) { 
+      alert("Error deleting meetup"); 
+    }
   };
 
   const handleAddPlace = async (newPlace) => {
-  const extraImages = newPlace.imagesText
-    .split("\n")
-    .map((url) => url.trim())
-    .filter(Boolean);
+    const extraImages = newPlace.imagesText
+      .split("\n")
+      .map((url) => url.trim())
+      .filter(Boolean);
+    const allImages = [
+      newPlace.mainImage,
+      ...extraImages
+    ].filter(Boolean);
+    try {
+      const res = await fetch("http://localhost:5000/api/places", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newPlace.name,
+          category: newPlace.category || "Suggestions",
+          image: newPlace.mainImage,
+          location: newPlace.loc,
+          rating: Number(newPlace.rate),
+          description: newPlace.desc,
+          images: allImages,
+        }),
+      });
+      const data = await res.json();
 
-  const allImages = [
-    newPlace.mainImage,
-    ...extraImages
-  ].filter(Boolean);
-  
-  try {
-    const res = await fetch("http://localhost:5000/api/places", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: newPlace.name,
-        category: newPlace.category || "Suggestions",
-        image: newPlace.mainImage,
-        location: newPlace.loc,
-        rating: Number(newPlace.rate),
-        description: newPlace.desc,
-        images: allImages,
-      }),
-    });
+      if (!res.ok) {
+        alert(data.message || "Failed to add place");
+        return;
+      }
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      alert(data.message || "Failed to add place");
-      return;
+      setPlaces([...places, data.place]);
+      setIsAddPlaceOpen(false);
+    } catch (err) {
+      alert("Server error");
     }
-
-    setPlaces([...places, data.place]);
-    setIsAddPlaceOpen(false);
-  } catch (err) {
-    alert("Server error");
-  }
-};
+  };
 
   const handleUpdatePlace = async(updatedPlace) => {
     try{
@@ -187,7 +275,6 @@ useEffect(() => {
       alert("Server error");
     }
   };
-   
 
   return (
     <div className="min-h-screen bg-[#060b1a] text-white font-sans overflow-x-hidden">
@@ -267,58 +354,61 @@ useEffect(() => {
                     method: "POST",
                     headers: {
                       "Content-Type": "application/json",
-                   },
-                   body: JSON.stringify({ name }),
+                    },
+                    body: JSON.stringify({ name }),
                   });
-                 const data = await res.json();
-                 if (!res.ok) {
-                   alert(data.message);
-                   return;
+                  const data = await res.json();
+                  if (!res.ok) {
+                    alert(data.message);
+                    return;
                   }
 
                   setCategories([...categories, data.category]);
                 } catch (err) {
                   alert("Server error");
                 }
-             }}
-             onDeleteCategory={async (id) => {
-               try {
-                 await fetch(`http://localhost:5000/api/categories/${id}`, {
-                   method: "DELETE",
-                 });
-                 setCategories(categories.filter((c) => c._id !== id));
-               } catch (err) {
-                 alert("Server error");
-               }
-             }}
-            onEdit={(p) => { setSelectedItem(p); setIsEditPlaceOpen(true); }}
-            onAddClick={() => setIsAddPlaceOpen(true)}
-            onRemove={async(id) =>{
-              try{
-                const res=await fetch(`http://localhost:5000/api/places/${id}`,{
-                  method:"DELETE"
-               });
-               const data=await res.json();
-               if(!res.ok){
-                 alert(data.message||"Failed to delete");
-                 return;
-               }
-               setPlaces(places.filter((x)=> x._id !==id));
-             }catch(err){
-               alert("Server error");
-             }
-           }}
-         />
+              }}
+              onDeleteCategory={async (id) => {
+                try {
+                  await fetch(`http://localhost:5000/api/categories/${id}`, {
+                    method: "DELETE",
+                  });
+                  setCategories(categories.filter((c) => c._id !== id));
+                } catch (err) {
+                  alert("Server error");
+                }
+              }}
+              onEdit={(p) => { setSelectedItem(p); setIsEditPlaceOpen(true); }}
+              onAddClick={() => setIsAddPlaceOpen(true)}
+              onRemove={async(id) =>{
+                try{
+                  const res=await fetch(`http://localhost:5000/api/places/${id}`,{
+                    method:"DELETE"
+                  });
+                  const data=await res.json();
+                  if(!res.ok){
+                    alert(data.message||"Failed to delete");
+                    return;
+                  }
+                  setPlaces(places.filter((x)=> x._id !==id));
+                }catch(err){
+                  alert("Server error");
+                }
+              }}
+            />
           )}
+          
+          {/* ✨ تعديل: ربط دالة الحذف الجديدة بدلاً من الفلترة الوهمية القديمة */}
           {activeTab === 'meetup' && (
             <MeetupSection 
               key="meetup" 
               data={filteredMeetups} 
               onEdit={(m) => { setSelectedItem(m); setIsEditMeetupOpen(true); }}
               onCreateClick={() => setIsCreateMeetupOpen(true)}
-              onBlock={(id) => setMeetups(meetups.filter(x => x.id !== id))}
+              onBlock={(id) => handleDeleteMeetup(id)}
             />
           )}
+
           {activeTab === 'users' && (
             <UsersSection 
               key="users" 
@@ -327,7 +417,6 @@ useEffect(() => {
               onBlock={async (user) => {
                 try {
                   const id = user._id || user.id;
-
                   const res = await fetch(`http://localhost:5000/api/users/${id}/block`, {
                     method: "PUT",
                     headers: {
@@ -337,7 +426,6 @@ useEffect(() => {
                       isBlocked: !user.isBlocked,
                     }),
                   });
-
                   const data = await res.json();
 
                   if (!res.ok) {
@@ -378,6 +466,7 @@ useEffect(() => {
       />
 
       <CreateMeetupModal isOpen={isCreateMeetupOpen} onClose={() => setIsCreateMeetupOpen(false)} onCreate={handleCreateMeetup} />
+      
       <RestrictUserModal
         isOpen={isRestrictUserOpen}
         onClose={() => setIsRestrictUserOpen(false)}
@@ -385,21 +474,19 @@ useEffect(() => {
         onSave={async (user, permissions) => {
           try {
             const id = user._id || user.id;
-
             const res = await fetch(
               `http://localhost:5000/api/users/${id}/permissions`,
               {
                 method: "PUT",
                 headers: {
                   "Content-Type": "application/json",
-               },
-               body: JSON.stringify(permissions),
-             }
+                },
+                body: JSON.stringify(permissions),
+              }
             );
+            const data = await res.json();
 
-           const data = await res.json();
-
-           if (!res.ok) {
+            if (!res.ok) {
               alert(data.message || "Failed to update permissions");
               return;
             }
@@ -408,14 +495,13 @@ useEffect(() => {
               users.map((u) =>
                 (u._id || u.id) === id ? data.user : u
               )
-           );
-
-           setIsRestrictUserOpen(false);
-         } catch (err) {
-           alert("Server error");
-         }
-       }}
-     />
+            );
+            setIsRestrictUserOpen(false);
+          } catch (err) {
+            alert("Server error");
+          }
+        }}
+      />
     </div>
   );
 }
@@ -463,151 +549,151 @@ const PlacesSection = ({
         </h2>
 
         <div className="flex gap-4">
-  <button
-    onClick={() => setIsCategoryModalOpen(true)}
-    className="bg-[#0f172a] border border-[#ff6b35]/40 text-[#ff6b35] px-6 py-3 rounded-full font-black uppercase text-xs hover:bg-[#ff6b35]/10"
-  >
-    Manage Categories
-  </button>
-
-  <button
-    onClick={onAddClick}
-    className="bg-[#ff6b35] px-8 py-3 rounded-full font-black uppercase text-xs shadow-[0_0_20px_rgba(255,107,53,0.3)]"
-  >
-    ＋ Add Place
-  </button>
-</div>
-      </div>
-
-     <AnimatePresence>
-  {isCategoryModalOpen && (
-    <div className="fixed inset-0 z-[170] flex items-center justify-center p-6">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={() => setIsCategoryModalOpen(false)}
-        className="absolute inset-0 bg-black/80 backdrop-blur-xl"
-      />
-
-      <motion.div
-        initial={{ y: 40, opacity: 0, scale: 0.95 }}
-        animate={{ y: 0, opacity: 1, scale: 1 }}
-        exit={{ y: 40, opacity: 0, scale: 0.95 }}
-        className="relative bg-[#161e31] w-full max-w-lg rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden"
-      >
-        <div className="flex justify-between items-center px-10 pt-10 pb-6">
-          <h2 className="text-3xl font-black uppercase text-[#ff6b35]">
+          <button
+            onClick={() => setIsCategoryModalOpen(true)}
+            className="bg-[#0f172a] border border-[#ff6b35]/40 text-[#ff6b35] px-6 py-3 rounded-full font-black uppercase text-xs hover:bg-[#ff6b35]/10"
+          >
             Manage Categories
-          </h2>
+          </button>
 
           <button
-            onClick={() => setIsCategoryModalOpen(false)}
-            className="text-3xl text-gray-400 hover:text-white"
+            onClick={onAddClick}
+            className="bg-[#ff6b35] px-8 py-3 rounded-full font-black uppercase text-xs shadow-[0_0_20px_rgba(255,107,53,0.3)]"
           >
-            ×
+            ＋ Add Place
           </button>
         </div>
+      </div>
 
-        <div className="px-10 pb-8 space-y-3 max-h-[320px] overflow-y-auto">
-          {categories.length === 0 ? (
-            <p className="text-gray-400 text-sm">No categories yet.</p>
-          ) : (
-            categories.map((c) => (
-              <div
-                key={c._id}
-                className="flex items-center justify-between bg-[#0f172a] border border-white/10 px-5 py-4 rounded-2xl"
-              >
-                <span className="font-bold">{c.name}</span>
-
-                <button
-                  onClick={() => onDeleteCategory(c._id)}
-                  className="text-red-400 font-black hover:text-red-300"
-                >
-                  Delete
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="p-8 bg-black/20">
-          <div className="flex gap-3">
-            <input
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-              placeholder="New category..."
-              className="flex-1 bg-[#060b1a] border border-white/10 px-5 py-4 rounded-2xl outline-none focus:border-[#ff6b35]"
+      <AnimatePresence>
+        {isCategoryModalOpen && (
+          <div className="fixed inset-0 z-[170] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsCategoryModalOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-xl"
             />
 
-            <button
-              onClick={() => {
-                if (!newCategory) return;
-                onAddCategory(newCategory);
-                setNewCategory("");
-              }}
-              className="bg-[#ff6b35] px-6 py-4 rounded-2xl font-black uppercase text-xs"
+            <motion.div
+              initial={{ y: 40, opacity: 0, scale: 0.95 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 40, opacity: 0, scale: 0.95 }}
+              className="relative bg-[#161e31] w-full max-w-lg rounded-[3rem] shadow-2xl border border-white/10 overflow-hidden"
             >
-              Add Category
-            </button>
+              <div className="flex justify-between items-center px-10 pt-10 pb-6">
+                <h2 className="text-3xl font-black uppercase text-[#ff6b35]">
+                  Manage Categories
+                </h2>
+
+                <button
+                  onClick={() => setIsCategoryModalOpen(false)}
+                  className="text-3xl text-gray-400 hover:text-white"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="px-10 pb-8 space-y-3 max-h-[320px] overflow-y-auto">
+                {categories.length === 0 ? (
+                  <p className="text-gray-400 text-sm">No categories yet.</p>
+                ) : (
+                  categories.map((c) => (
+                    <div
+                      key={c._id}
+                      className="flex items-center justify-between bg-[#0f172a] border border-white/10 px-5 py-4 rounded-2xl"
+                    >
+                      <span className="font-bold">{c.name}</span>
+
+                      <button
+                        onClick={() => onDeleteCategory(c._id)}
+                        className="text-red-400 font-black hover:text-red-300"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="p-8 bg-black/20">
+                <div className="flex gap-3">
+                  <input
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="New category..."
+                    className="flex-1 bg-[#060b1a] border border-white/10 px-5 py-4 rounded-2xl outline-none focus:border-[#ff6b35]"
+                  />
+
+                  <button
+                    onClick={() => {
+                      if (!newCategory) return;
+                      onAddCategory(newCategory);
+                      setNewCategory("");
+                    }}
+                    className="bg-[#ff6b35] px-6 py-4 rounded-2xl font-black uppercase text-xs"
+                  >
+                    Add Category
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      </motion.div>
-    </div>
-  )}
-</AnimatePresence>
+        )}
+      </AnimatePresence>
+
       {/* ⭐ Places cards */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-  {data.map((p) => (
-    <motion.div
-      layout
-      key={p._id || p.id}
-      className="bg-[#6d28d9] rounded-[2.5rem] overflow-hidden shadow-2xl"
-    >
-      <img
-        src={p.image || p.img}
-        alt=""
-        className="h-72 w-full object-cover"
-      />
-
-      <div className="p-8">
-        <h3 className="text-2xl font-bold mb-3">{p.name}</h3>
-
-        <p className="text-purple-100 text-sm mb-4 h-12 overflow-hidden">
-          {p.description ||p.desc}
-        </p>
-
-        <div className="flex items-center gap-4 text-xs font-bold text-purple-200 mb-8">
-          <span>📍 {p.location ||p.loc}</span>
-          <span>⭐ {p.rating ||p.rate}</span>
-          {p.phone && <span>📞 {p.phone}</span>}
-        </div>
-
-        <div className="flex gap-4">
-          <button
-            onClick={() => onEdit(p)}
-            className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-bold uppercase tracking-widest text-xs"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        {data.map((p) => (
+          <motion.div
+            layout
+            key={p._id || p.id}
+            className="bg-[#6d28d9] rounded-[2.5rem] overflow-hidden shadow-2xl"
           >
-            ✏️ Edit
-          </button>
+            <img
+              src={p.image || p.img}
+              alt=""
+              className="h-72 w-full object-cover"
+            />
 
-          <button
-            onClick={() => onRemove(p._id || p.id)}
-            className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-bold uppercase tracking-widest text-xs"
-          >
-            🗑️ Remove
-          </button>
-        </div>
+            <div className="p-8">
+              <h3 className="text-2xl font-bold mb-3">{p.name}</h3>
+
+              <p className="text-purple-100 text-sm mb-4 h-12 overflow-hidden">
+                {p.description ||p.desc}
+              </p>
+
+              <div className="flex items-center gap-4 text-xs font-bold text-purple-200 mb-8">
+                <span>📍 {p.location ||p.loc}</span>
+                <span>⭐ {p.rating ||p.rate}</span>
+                {p.phone && <span>📞 {p.phone}</span>}
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => onEdit(p)}
+                  className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-bold uppercase tracking-widest text-xs"
+                >
+                  ✏️ Edit
+                </button>
+
+                <button
+                  onClick={() => onRemove(p._id || p.id)}
+                  className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-bold uppercase tracking-widest text-xs"
+                >
+                  🗑️ Remove
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        ))}
       </div>
     </motion.div>
-  ))}
-</div>
-</motion.div>
-);
+  );
 };
 
-
-
+// ✨ تعديل: مكون عرض الـ Meetups المحدث ليتعامل مع بيانات الداتابيس الحية وحساب المشتركين الحقيقيين
 const MeetupSection = ({ data, onEdit, onBlock, onCreateClick }) => (
   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
     <div className="flex justify-between items-center mb-10">
@@ -615,20 +701,24 @@ const MeetupSection = ({ data, onEdit, onBlock, onCreateClick }) => (
       <button onClick={onCreateClick} className="bg-[#ff6b35] px-8 py-3 rounded-full font-black uppercase text-xs shadow-[0_0_20px_rgba(255,107,53,0.3)]">＋ Create New Meetup</button>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      {data.map(m => (
-        <motion.div layout key={m.id} className="bg-[#6d28d9] p-10 rounded-[2.5rem] shadow-xl">
-          <h3 className="text-2xl font-bold mb-6">{m.title}</h3>
-          <div className="space-y-3 text-purple-100 mb-10">
-            <p>📍 {m.loc}</p>
-            <p>📅 {m.time}</p>
-            <p>👥 {m.p} People</p>
-          </div>
-          <div className="flex gap-4">
-            <button onClick={() => onEdit(m)} className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-bold uppercase text-xs">✏️ Edit</button>
-            <button onClick={() => onBlock(m.id)} className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-bold uppercase text-xs">🚫 Delete</button>
-          </div>
-        </motion.div>
-      ))}
+      {data.map(m => {
+        const totalAttendees = m.attendees ? m.attendees.length : 0;
+        const maxLimit = m.maxParticipants || m.p || 10;
+        return (
+          <motion.div layout key={m._id || m.id} className="bg-[#6d28d9] p-10 rounded-[2.5rem] shadow-xl">
+            <h3 className="text-2xl font-bold mb-6">{m.title}</h3>
+            <div className="space-y-3 text-purple-100 mb-10">
+              <p>📍 {m.location || m.loc}</p>
+              <p>📅 {m.date || m.time} {m.time && !m.date ? "" : `• ${m.time || ""}`}</p>
+              <p>👥 {totalAttendees} / {maxLimit} Joined</p>
+            </div>
+            <div className="flex gap-4">
+              <button onClick={() => onEdit(m)} className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-bold uppercase text-xs">✏️ Edit</button>
+              <button onClick={() => onBlock(m._id || m.id)} className="flex-1 bg-red-600 hover:bg-red-700 py-4 rounded-2xl font-bold uppercase text-xs transition-colors">🚫 Delete</button>
+            </div>
+          </motion.div>
+        );
+      })}
     </div>
   </motion.div>
 );
@@ -670,204 +760,208 @@ const AddPlaceModal = ({ isOpen, onClose, onAdd, categories }) => {
     category: '',
   });
   return (
-  <AnimatePresence>
-    {isOpen && (
-      <div className="fixed inset-0 z-[160] flex items-center justify-center p-6">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-black/80 backdrop-blur-xl"
-        />
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+          />
 
-        <motion.div
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="relative bg-[#161e31] w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden border border-white/10"
-        >
-          <div className="px-8 pt-8 pb-4">
-            <h2 className="text-3xl font-black uppercase text-[#ff6b35]">
-              Add New Place
-            </h2>
-          </div>
-
-          <div className="px-8 pb-8 space-y-3 ">
-            <input
-              type="text"
-              placeholder="Main Image URL"
-              onChange={(e) =>
-                setFormData({ ...formData, mainImage: e.target.value })
-              }
-             className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
-            />
-
-            <div className="flex justify-start">
-              <button
-                 type="button"
-                 onClick={() => setIsImagesModalOpen(true)}
-                 className="border border-[#ff6b35]/40 text-[#ff6b35] px-4 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-[#ff6b35]/10 transition-all"
-              >
-                + More Images
-              </button>
+          <motion.div
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="relative bg-[#161e31] w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden border border-white/10"
+          >
+            <div className="px-8 pt-8 pb-4">
+              <h2 className="text-3xl font-black uppercase text-[#ff6b35]">
+                Add New Place
+              </h2>
             </div>
 
-            <input
-              type="text"
-              placeholder="Place Name"
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
-            />
-
-            <select
-              value={formData.category}
-              onChange={(e) =>
-                setFormData({ ...formData, category: e.target.value })
-              }
-              className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] text-gray-300"
-            >
-              <option value=""className="text-gray-500">Select Category</option>
-
-              {categories.map((c) => (
-                <option key={c._id} value={c.name} className="text-white">
-                  {c.name}
-                </option>
-              ))}
-            </select>
-
-            <input
-              type="text"
-              placeholder="Location"
-              onChange={(e) =>
-                setFormData({ ...formData, loc: e.target.value })
-              }
-              className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
-            />
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="px-8 pb-8 space-y-3 ">
               <input
                 type="text"
-                placeholder="Rate (e.g. 4.5)"
+                placeholder="Main Image URL"
                 onChange={(e) =>
-                  setFormData({ ...formData, rate: e.target.value })
+                  setFormData({ ...formData, mainImage: e.target.value })
                 }
-                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none"
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
               />
 
+              <div className="flex justify-start">
+                <button
+                  type="button"
+                  onClick={() => setIsImagesModalOpen(true)}
+                  className="border border-[#ff6b35]/40 text-[#ff6b35] px-4 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-[#ff6b35]/10 transition-all"
+                >
+                  + More Images
+                </button>
+              </div>
+
               <input
-                type="tel"
-                placeholder="Phone Number"
+                type="text"
+                placeholder="Place Name"
                 onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
+                  setFormData({ ...formData, name: e.target.value })
                 }
-                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none"
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
+              />
+
+              <select
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] text-gray-300"
+              >
+                <option value="" className="text-gray-500">Select Category</option>
+                {categories.map((c) => (
+                  <option key={c._id} value={c.name} className="text-white">
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                type="text"
+                placeholder="Location"
+                onChange={(e) =>
+                  setFormData({ ...formData, loc: e.target.value })
+                }
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  placeholder="Rate (e.g. 4.5)"
+                  onChange={(e) =>
+                    setFormData({ ...formData, rate: e.target.value })
+                  }
+                  className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none"
+                />
+
+                <input
+                  type="tel"
+                  placeholder="Phone Number"
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                  className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none"
+                />
+              </div>
+
+              <textarea
+                placeholder="About the place..."
+                rows="3"
+                onChange={(e) =>
+                  setFormData({ ...formData, desc: e.target.value })
+                }
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none"
               />
             </div>
 
-            <textarea
-              placeholder="About the place..."
-              rows="3"
-              onChange={(e) =>
-                setFormData({ ...formData, desc: e.target.value })
-              }
-              className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none"
-            />
-          </div>
+            <div className="flex gap-4 p-8 bg-black/20">
+              <button
+                onClick={onClose}
+                className="flex-1 border-2 border-white/5 py-4 rounded-2xl font-black uppercase text-xs hover:bg-white/5 transition-all"
+              >
+                Cancel
+              </button>
 
-          <div className="flex gap-4 p-8 bg-black/20">
-            <button
-              onClick={onClose}
-              className="flex-1 border-2 border-white/5 py-4 rounded-2xl font-black uppercase text-xs hover:bg-white/5 transition-all"
-            >
-              Cancel
-            </button>
+              <button
+                onClick={() => onAdd(formData)}
+                className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-black uppercase text-xs shadow-lg"
+              >
+                Add
+              </button>
+            </div>
+          </motion.div>
+          <AnimatePresence>
+            {isImagesModalOpen && (
+              <div className="fixed inset-0 z-[180] flex items-center justify-center p-6">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsImagesModalOpen(false)}
+                  className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                />
 
-            <button
-              onClick={() => onAdd(formData)}
-              className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-black uppercase text-xs shadow-lg"
-            >
-              Add
-            </button>
-          </div>
-        </motion.div>
-        <AnimatePresence>
-  {isImagesModalOpen && (
-    <div className="fixed inset-0 z-[180] flex items-center justify-center p-6">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={() => setIsImagesModalOpen(false)}
-        className="absolute inset-0 bg-black/60 backdrop-blur-md"
-      />
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 border border-white/10 shadow-2xl"
+                >
+                  <h3 className="text-2xl font-black uppercase text-[#ff6b35] mb-4">
+                    Extra Images
+                  </h3>
 
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 border border-white/10 shadow-2xl"
-      >
-        <h3 className="text-2xl font-black uppercase text-[#ff6b35] mb-4">
-          Extra Images
-        </h3>
+                  <textarea
+                    value={formData.imagesText}
+                    placeholder="One image URL per line"
+                    rows="6"
+                    onChange={(e) =>
+                      setFormData({ ...formData, imagesText: e.target.value })
+                    }
+                    className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none"
+                  />
 
-        <textarea
-          value={formData.imagesText}
-          placeholder="One image URL per line"
-          rows="6"
-          onChange={(e) =>
-            setFormData({ ...formData, imagesText: e.target.value })
-          }
-          className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none"
-        />
+                  <div className="flex gap-4 mt-6">
+                    <button
+                      onClick={() => setIsImagesModalOpen(false)}
+                      className="flex-1 border border-white/10 py-3 rounded-xl font-black uppercase text-xs hover:bg-white/5"
+                    >
+                      Cancel
+                    </button>
 
-        <div className="flex gap-4 mt-6">
-          <button
-            onClick={() => setIsImagesModalOpen(false)}
-            className="flex-1 border border-white/10 py-3 rounded-xl font-black uppercase text-xs hover:bg-white/5"
-          >
-            Cancel
-          </button>
-
-          <button
-            onClick={() => setIsImagesModalOpen(false)}
-            className="flex-1 bg-[#ff6b35] py-3 rounded-xl font-black uppercase text-xs"
-          >
-            Done
-          </button>
+                    <button
+                      onClick={() => setIsImagesModalOpen(false)}
+                      className="flex-1 bg-[#ff6b35] py-3 rounded-xl font-black uppercase text-xs"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
         </div>
-      </motion.div>
-    </div>
-  )}
-</AnimatePresence>
-      </div>
-    )}
-  </AnimatePresence>
-);
+      )}
+    </AnimatePresence>
+  );
 };
 
+// ✨ تعديل: الـ CreateMeetupModal لتضمين حقول التاريخ، الوقت والحد الأقصى للتسجيل بشكل منظم
 const CreateMeetupModal = ({ isOpen, onClose, onCreate }) => {
-  const [formData, setFormData] = useState({ title: '', loc: '', time: '', p: '' });
+  const [formData, setFormData] = useState({ title: '', loc: '', date: '', time: '', p: '', notes: '' });
   return (
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-6">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-xl" />
-          <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="relative bg-[#161e31] w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
+          <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="relative bg-[#161e31] w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
             <div className="px-12 pt-12 pb-6"><h2 className="text-3xl font-black uppercase text-[#ff6b35] mb-2">Create Meetup</h2></div>
-            <div className="px-12 pb-10 space-y-5">
-              <input type="text" onChange={(e)=>setFormData({...formData, title: e.target.value})} placeholder="Meetup Name" className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
-              <input type="text" onChange={(e)=>setFormData({...formData, loc: e.target.value})} placeholder="Place Name" className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
+            <div className="px-12 pb-10 space-y-4">
+              <input type="text" onChange={(e)=>setFormData({...formData, title: e.target.value})} placeholder="Meetup Name" className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none text-white focus:ring-2 focus:ring-[#ff6b35]" />
+              <input type="text" onChange={(e)=>setFormData({...formData, loc: e.target.value})} placeholder="Place Name / Location" className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none text-white focus:ring-2 focus:ring-[#ff6b35]" />
+              
               <div className="grid grid-cols-2 gap-4">
-                <input type="text" onChange={(e)=>setFormData({...formData, time: e.target.value})} placeholder="Date and Time" className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none" />
-                <input type="number" onChange={(e)=>setFormData({...formData, p: e.target.value})} placeholder="Attendance" className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none" />
+                <input type="date" onChange={(e)=>setFormData({...formData, date: e.target.value})} className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none text-white focus:ring-2 focus:ring-[#ff6b35]" />
+                <input type="time" onChange={(e)=>setFormData({...formData, time: e.target.value})} className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none text-white focus:ring-2 focus:ring-[#ff6b35]" />
               </div>
+
+              <input type="number" min="2" placeholder="Max Attendance Limit" onChange={(e)=>setFormData({...formData, p: e.target.value})} className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none text-white focus:ring-2 focus:ring-[#ff6b35]" />
+              <textarea placeholder="Meetup Notes / Description..." rows="2" onChange={(e)=>setFormData({...formData, notes: e.target.value})} className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none text-white resize-none focus:ring-2 focus:ring-[#ff6b35]" />
             </div>
             <div className="flex gap-4 p-10 bg-black/20">
-              <button onClick={onClose} className="flex-1 border-2 border-white/5 py-5 rounded-2xl font-black uppercase text-xs transition-all">Cancel</button>
-              <button onClick={() => onCreate(formData)} className="flex-1 bg-[#ff6b35] py-5 rounded-2xl font-black uppercase text-xs shadow-lg">Create</button>
+              <button onClick={onClose} className="flex-1 border border-white/10 py-5 rounded-2xl font-black uppercase text-xs hover:bg-white/5 transition-all">Cancel</button>
+              <button onClick={() => onCreate(formData)} className="flex-1 bg-[#ff6b35] py-5 rounded-2xl font-black uppercase text-xs shadow-lg hover:bg-[#e05a2b] transition-all">Create</button>
             </div>
           </motion.div>
         </div>
@@ -883,7 +977,7 @@ const EditMeetupModal = ({ isOpen, onClose, meetup, onCreateNew, onSave }) => {
   useEffect(() => {
     if (meetup) {
       setTitle(meetup.title || '');
-      setAttendees(['David Martinez', 'Olivia Brown']); 
+      setAttendees(meetup.attendees || ['David Martinez', 'Olivia Brown']);
     }
   }, [meetup, isOpen]);
 
@@ -894,8 +988,9 @@ const EditMeetupModal = ({ isOpen, onClose, meetup, onCreateNew, onSave }) => {
   const handleSave = () => {
     onSave({ 
       ...meetup, 
-      title: title,
-      p: attendees.length 
+      title: title, 
+      attendees: attendees,
+      maxParticipants: meetup.maxParticipants || meetup.p || 10
     });
   };
 
@@ -909,31 +1004,20 @@ const EditMeetupModal = ({ isOpen, onClose, meetup, onCreateNew, onSave }) => {
               <h2 className="text-2xl font-black uppercase">Edit Meetup</h2>
               <button onClick={onClose} className="text-3xl text-gray-400">✕</button>
             </div>
-            
             <div className="px-10 pb-10 space-y-6">
               <div className="space-y-2 text-left">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-2">Meetup Title</label>
-                <input 
-                  type="text" 
-                  value={title} 
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full bg-[#6d28d9] p-5 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" 
-                />
+                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-[#6d28d9] p-5 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
               </div>
-
               <button onClick={onCreateNew} className="w-full bg-[#6d28d9] py-5 rounded-2xl font-black text-lg hover:brightness-110">
                 Create New Meetup
               </button>
-              
               <div className="pt-4 space-y-4">
                 <p className="text-xs font-bold text-gray-400 uppercase text-left ml-2">Attendees List</p>
                 {attendees.map((n, i) => (
                   <div key={i} className="flex items-center justify-between bg-[#6d28d9] p-5 rounded-3xl">
                     <span className="font-bold">{n}</span>
-                    <button 
-                      onClick={() => handleRemoveAttendee(n)}
-                      className="bg-[#ff6b35] px-4 py-2 rounded-xl font-bold text-xs hover:scale-105 transition-transform"
-                    >
+                    <button onClick={() => handleRemoveAttendee(n)} className="bg-[#ff6b35] px-4 py-2 rounded-xl font-bold text-xs hover:scale-105 transition-transform" >
                       Remove
                     </button>
                   </div>
@@ -941,7 +1025,6 @@ const EditMeetupModal = ({ isOpen, onClose, meetup, onCreateNew, onSave }) => {
                 {attendees.length === 0 && <p className="text-gray-500 italic">No attendees remaining</p>}
               </div>
             </div>
-
             <div className="flex gap-6 p-10 bg-black/20">
               <button onClick={onClose} className="flex-1 bg-white/5 border border-white/10 py-5 rounded-2xl font-black uppercase text-xs">Cancel</button>
               <button onClick={handleSave} className="flex-1 bg-[#ff6b35] py-5 rounded-2xl font-black uppercase text-xs">Save</button>
@@ -956,13 +1039,13 @@ const EditMeetupModal = ({ isOpen, onClose, meetup, onCreateNew, onSave }) => {
 const RestrictUserModal = ({ isOpen, onClose, user, onSave }) => {
   const [res1, setRes1] = useState(user?.permissions?.createMeetup ?? true);
   const [res2, setRes2] = useState(user?.permissions?.addOthers ?? true);
-
   useEffect(() => {
     if (user) {
       setRes1(user?.permissions?.createMeetup ?? true);
       setRes2(user?.permissions?.addOthers ?? true);
-   }
+    }
   }, [user]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -1008,234 +1091,80 @@ const EditPlaceModal = ({ isOpen, onClose, place, onSave }) => {
   });
 
   useEffect(() => {
-  if (place) {
-    const mainImage = place.image || place.img || "";
-    const imagesArray = Array.isArray(place.images) ? place.images : [];
+    if (place) {
+      const mainImage = place.image || place.img || "";
+      const imagesArray = Array.isArray(place.images) ? place.images : [];
+      setFormData({
+        name: place.name || "",
+        loc: place.loc || place.location || "",
+        phone: place.phone || "",
+        desc: place.desc || place.description || "",
+        img: mainImage,
+        imagesText: imagesArray.join("\n"),
+        rate: place.rate || place.rating || "",
+      });
+    }
+  }, [place, isOpen]);
 
-    setFormData({
-      name: place.name || "",
-      loc: place.loc || place.location || "",
-      phone: place.phone || "",
-      desc: place.desc || place.description || "",
-      img: mainImage,
-      imagesText: imagesArray.join("\n"),
-      rate: place.rate || place.rating || "",
+  const handleSave = () => {
+    const imagesFromPopup = formData.imagesText
+      .split("\n")
+      .map((url) => url.trim())
+      .filter(Boolean);
+
+    const allImages = [
+      formData.img,
+      ...imagesFromPopup.filter((url) => url !== formData.img),
+    ].filter(Boolean);
+
+    onSave({
+      ...place,
+      ...formData,
+      image: formData.img,
+      images: allImages,
+      rating: Number(formData.rate),
+      description: formData.desc,
     });
-  }
-}, [place, isOpen]);
-
- const handleSave = () => {
-  const imagesFromPopup = formData.imagesText
-    .split("\n")
-    .map((url) => url.trim())
-    .filter(Boolean);
-
-  const allImages = [
-    formData.img,
-    ...imagesFromPopup.filter((url) => url !== formData.img),
-  ].filter(Boolean);
-
-  onSave({
-    ...place,
-    ...formData,
-    image: formData.img,
-    images: allImages,
-    rating: Number(formData.rate),
-    description: formData.desc,
-  });
-};
+  };
 
   return (
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-6">
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/80 backdrop-blur-md"
-          />
-
-          <motion.div
-            initial={{ scale: 0.9 }}
-            animate={{ scale: 1 }}
-            className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 shadow-2xl"
-          >
-            <h2 className="text-xl font-black uppercase mb-6 text-[#ff6b35]">
-              Edit Place
-            </h2>
-
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+          <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 shadow-2xl" >
+            <h2 className="text-xl font-black uppercase mb-6 text-[#ff6b35]"> Edit Place </h2>
             <div className="space-y-4">
-
-              {/* Name */}
-              <div className="space-y-1 text-left">
-                <label className="text-[10px] text-gray-400 font-bold uppercase ml-1">
-                  Place Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  className="w-full bg-[#6d28d9] p-3 rounded-xl outline-none focus:ring-2 focus:ring-[#ff6b35]"
-                />
+              <input type="text" value={formData.img} placeholder="Main Image URL" onChange={(e) => setFormData({ ...formData, img: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
+              <div className="flex justify-start"><button type="button" onClick={() => setIsImagesModalOpen(true)} className="border border-[#ff6b35]/40 text-[#ff6b35] px-4 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-[#ff6b35]/10 transition-all">+ Edit Extra Images</button></div>
+              <input type="text" value={formData.name} placeholder="Place Name" onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
+              <input type="text" value={formData.loc} placeholder="Location" onChange={(e) => setFormData({ ...formData, loc: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
+              <div className="grid grid-cols-2 gap-4">
+                <input type="text" value={formData.rate} placeholder="Rate" onChange={(e) => setFormData({ ...formData, rate: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none" />
+                <input type="tel" value={formData.phone} placeholder="Phone Number" onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none" />
               </div>
-
-              {/* Image (لوحده) */}
-              <div className="space-y-1 text-left">
-                <label className="text-[10px] text-gray-400 font-bold uppercase ml-1">
-                  Image
-                </label>
-                <input
-                  type="text"
-                  value={formData.img}
-                  onChange={(e) =>
-                    setFormData({ ...formData, img: e.target.value })
-                  }
-                  className="w-full bg-[#6d28d9] p-3 rounded-xl outline-none focus:ring-2 focus:ring-[#ff6b35]"
-                />
-              </div>
-              <div className="flex justify-start">
-                <button
-                  type="button"
-                  onClick={() => setIsImagesModalOpen(true)}
-                  className="border border-[#ff6b35]/40 text-[#ff6b35] px-4 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-[#ff6b35]/10 transition-all"
-                >
-                  Edit More Images
-               </button>
-              </div>
-
-              {/* Rate */}
-              <div className="space-y-1 text-left">
-                <label className="text-[10px] text-gray-400 font-bold uppercase ml-1">
-                  Rate
-                </label>
-                <input
-                  type="text"
-                  value={formData.rate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, rate: e.target.value })
-                  }
-                  className="w-full bg-[#6d28d9] p-3 rounded-xl outline-none focus:ring-2 focus:ring-[#ff6b35]"
-                />
-              </div>
-
-              {/* Location + Phone */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1 text-left">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase ml-1">
-                    Location
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.loc}
-                    onChange={(e) =>
-                      setFormData({ ...formData, loc: e.target.value })
-                    }
-                    className="w-full bg-[#6d28d9] p-3 rounded-xl outline-none focus:ring-2 focus:ring-[#ff6b35]"
-                  />
-                </div>
-
-                <div className="space-y-1 text-left">
-                  <label className="text-[10px] text-gray-400 font-bold uppercase ml-1">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
-                    className="w-full bg-[#6d28d9] p-3 rounded-xl outline-none focus:ring-2 focus:ring-[#ff6b35]"
-                  />
-                </div>
-              </div>
-
-              {/* About */}
-              <div className="space-y-1 text-left">
-                <label className="text-[10px] text-gray-400 font-bold uppercase ml-1">
-                  About
-                </label>
-                <textarea
-                  value={formData.desc}
-                  onChange={(e) =>
-                    setFormData({ ...formData, desc: e.target.value })
-                  }
-                  rows="3"
-                  className="w-full bg-[#6d28d9] p-3 rounded-xl outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none"
-                />
-              </div>
-
+              <textarea value={formData.desc} placeholder="About..." rows="3" onChange={(e) => setFormData({ ...formData, desc: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none" />
             </div>
-
-            <div className="flex gap-4 mt-8">
-              <button
-                onClick={onClose}
-                className="flex-1 bg-white/5 border border-white/10 py-3 rounded-xl font-black uppercase hover:bg-white/10 transition-all"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={handleSave}
-                className="flex-1 bg-[#ff6b35] py-3 rounded-xl font-black uppercase shadow-lg shadow-[#ff6b35]/20 hover:brightness-110 transition-all"
-              >
-                Save
-              </button>
+            <div className="flex gap-4 mt-6">
+              <button onClick={onClose} className="flex-1 border border-white/5 py-4 rounded-2xl font-black uppercase text-xs hover:bg-white/5">Cancel</button>
+              <button onClick={handleSave} className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-black uppercase text-xs shadow-lg">Save</button>
             </div>
           </motion.div>
           <AnimatePresence>
-  {isImagesModalOpen && (
-    <div className="fixed inset-0 z-[180] flex items-center justify-center p-6">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={() => setIsImagesModalOpen(false)}
-        className="absolute inset-0 bg-black/60 backdrop-blur-md"
-      />
-
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 border border-white/10 shadow-2xl"
-      >
-        <h3 className="text-2xl font-black uppercase text-[#ff6b35] mb-4">
-          Edit Extra Images
-        </h3>
-
-        <textarea
-          value={formData.imagesText}
-          placeholder="One image URL per line"
-          rows="6"
-          onChange={(e) =>
-            setFormData({ ...formData, imagesText: e.target.value })
-          }
-          className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none"
-        />
-
-        <div className="flex gap-4 mt-6">
-          <button
-            onClick={() => setIsImagesModalOpen(false)}
-            className="flex-1 border border-white/10 py-3 rounded-xl font-black uppercase text-xs hover:bg-white/5"
-          >
-            Cancel
-          </button>
-
-          <button
-            onClick={() => setIsImagesModalOpen(false)}
-            className="flex-1 bg-[#ff6b35] py-3 rounded-xl font-black uppercase text-xs"
-          >
-            Done
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  )}
-</AnimatePresence>
+            {isImagesModalOpen && (
+              <div className="fixed inset-0 z-[180] flex items-center justify-center p-6">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsImagesModalOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-md" />
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 border border-white/10 shadow-2xl" >
+                  <h3 className="text-2xl font-black uppercase text-[#ff6b35] mb-4">Edit Extra Images</h3>
+                  <textarea value={formData.imagesText} placeholder="One image URL per line" rows="6" onChange={(e) => setFormData({ ...formData, imagesText: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none" />
+                  <div className="flex gap-4 mt-6">
+                    <button onClick={() => setIsImagesModalOpen(false)} className="flex-1 border border-white/10 py-3 rounded-xl font-black uppercase text-xs hover:bg-white/5">Cancel</button>
+                    <button onClick={() => setIsImagesModalOpen(false)} className="flex-1 bg-[#ff6b35] py-3 rounded-xl font-black uppercase text-xs">Done</button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
         </div>
       )}
     </AnimatePresence>

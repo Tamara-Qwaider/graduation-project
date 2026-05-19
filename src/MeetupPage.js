@@ -7,9 +7,10 @@ export default function MeetupPage() {
   /* =========================
       🧠 STATE & REFS
   ========================= */
-  const emptyForm = { placeName: "", meetupName: "", date: "", time: "", invitePeople: [], notes: "" };
+  // الحفاظ على الفورم الأساسي مع إضافة خانة الحد الأقصى
+  const emptyForm = { placeName: "", meetupName: "", date: "", time: "", invitePeople: [], maxParticipants: 10, notes: "" };
   const [searchTerm, setSearchTerm] = useState("");
-  const [userSearchTerm, setUserSearchTerm] = useState(""); // حالة خاصة ببحث المستخدمين بداخل الـ Dropdown
+  const [userSearchTerm, setUserSearchTerm] = useState(""); 
   const [selectedMeetup, setSelectedMeetup] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
@@ -30,8 +31,11 @@ export default function MeetupPage() {
     try {
       const res = await fetch("http://localhost:5000/api/meetups");
       const data = await res.json();
-      setMeetups(data);
-    } catch (err) { console.error("Fetch error:", err); }
+      setMeetups(Array.isArray(data) ? data : []); // حماية في حال لم تكن الداتا مصفوفة
+    } catch (err) { 
+      console.error("Fetch error:", err); 
+      setMeetups([]); // تجنب انهيار الموقع عند حدوث خطأ شبكة
+    }
   }, []);
 
   const fetchUsers = useCallback(async () => {
@@ -62,6 +66,7 @@ export default function MeetupPage() {
       time: formData.time,
       invitedPeople: formData.invitePeople,
       notes: formData.notes,
+      maxParticipants: Number(formData.maxParticipants) || 10, // ربط المتغير الجديد بالباك إند
       createdBy: loggedInUser?.name || "Guest",
       attendees: [loggedInUser?.name || "Host"],
       img: `https://picsum.photos/400/250?random=${Math.random()}`
@@ -108,6 +113,14 @@ export default function MeetupPage() {
       return;
     }
     if (!loggedInUser) return alert("Please login first");
+    
+    // فحص حماية لمنع الحجز إذا اللقاء ممتلئ تماماً
+    const currentAttendeesCount = selectedMeetup.attendees ? selectedMeetup.attendees.length : 0;
+    const maxLimit = selectedMeetup.maxParticipants || 10;
+    if (currentAttendeesCount >= maxLimit) {
+      return alert("Sorry, this meetup is full!");
+    }
+
     const res = await fetch(`http://localhost:5000/api/meetups/${id}/join`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -120,7 +133,10 @@ export default function MeetupPage() {
     }
   };
 
-  const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formatDate = (d) => {
+    if (!d) return "";
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   /* =========================
       🖥️ RENDER
@@ -143,18 +159,28 @@ export default function MeetupPage() {
       </div>
 
       <div className="meetup-grid-layout">
-        {meetups.filter(m => m.title?.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
-          <div key={item._id} className="meetup-card-custom" onClick={() => { setSelectedMeetup(item); setShowParticipants(false); }}>
-            <img src={item.img} alt="meetup" className="card-img" />
-            <div className="card-content">
-              <h3>{item.title}</h3>
-              <p className="card-date">{formatDate(item.date)} • {item.time}</p>
-              <div className="card-attendees">
-                <span>👥 {item.attendees.length} participants</span>
+        {(meetups || [])
+          .filter(m => m.title?.toLowerCase().includes(searchTerm.toLowerCase()))
+          .map((item) => {
+            // 🛠️ الحماية الذهبية هنا: إذا كانت المصفوفة غير موجودة بسبب داتا قديمة لا ينهار الموقع
+            const totalParticipants = item.attendees ? item.attendees.length : 0;
+            const maxLimit = item.maxParticipants || 10;
+
+            return (
+              <div key={item._id} className="meetup-card-custom" onClick={() => { setSelectedMeetup(item); setShowParticipants(false); }}>
+                <img src={item.img} alt="meetup" className="card-img" />
+                <div className="card-content">
+                  <h3>{item.title}</h3>
+                  <p className="card-date">{formatDate(item.date)} • {item.time}</p>
+                  <div className="card-attendees">
+                    {/* تحديث العداد ليعرض المشاركين الحاليين من الحد الأقصى */}
+                    <span>👥 {totalParticipants} / {maxLimit} participants</span>
+                    {totalParticipants >= maxLimit && <span style={{color: "#ff4d4d", fontSize: "12px", marginLeft: "8px"}}>Full 🚫</span>}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        ))}
+            );
+          })}
       </div>
 
       {/* POPUP DETAILS */}
@@ -163,6 +189,9 @@ export default function MeetupPage() {
           <div className="popup-content" onClick={e => e.stopPropagation()}>
             <img src={selectedMeetup.img} alt="popup" className="popup-image" />
             <div className="popup-body">
+              <h3>{selectedMeetup.title}</h3>
+              {selectedMeetup.notes && <p style={{color: "rgba(255,255,255,0.6)", marginBottom: "15px"}}>{selectedMeetup.notes}</p>}
+              
               <div className="popup-info-row">
                 <span className="info-icon">📍</span>
                 <div><small>Location</small><p>{selectedMeetup.location}</p></div>
@@ -171,16 +200,16 @@ export default function MeetupPage() {
               <div className="popup-info-row">
                 <span className="info-icon">👥</span>
                 <div className="participants-block" ref={participantsRef}>
-                  <small>Participants</small>
+                  <small>Participants ({selectedMeetup.attendees ? selectedMeetup.attendees.length : 0} / {selectedMeetup.maxParticipants || 10})</small>
                   <div className="participants-avatars" onClick={() => setShowParticipants(!showParticipants)}>
-                    {selectedMeetup.attendees.slice(0, 3).map((p, i) => (
-                      <div key={i} className="avatar-circle">{p.charAt(0)}</div>
+                    {(selectedMeetup.attendees || []).slice(0, 3).map((p, i) => (
+                      <div key={i} className="avatar-circle">{p ? p.charAt(0).toUpperCase() : "?"}</div>
                     ))}
-                    {selectedMeetup.attendees.length > 3 && <div className="avatar-circle">+{selectedMeetup.attendees.length - 3}</div>}
+                    {selectedMeetup.attendees?.length > 3 && <div className="avatar-circle">+{selectedMeetup.attendees.length - 3}</div>}
                   </div>
                   {showParticipants && (
                     <div className="participants-dropdown">
-                      {selectedMeetup.attendees.map((p, i) => <div key={i} className="participant-row">{p}</div>)}
+                      {(selectedMeetup.attendees || []).map((p, i) => <div key={i} className="participant-row">{p}</div>)}
                     </div>
                   )}
                 </div>
@@ -195,14 +224,17 @@ export default function MeetupPage() {
                     className="btn-send-request" 
                     onClick={() => handleJoinMeetup(selectedMeetup._id)}
                     disabled={
-                      selectedMeetup.attendees.includes(loggedInUser?.name) ||
+                      (selectedMeetup.attendees || []).includes(loggedInUser?.name) ||
+                      (selectedMeetup.attendees ? selectedMeetup.attendees.length : 0) >= (selectedMeetup.maxParticipants || 10) ||
                       !canJoinMeetups
                     }
                   >
                     {!canJoinMeetups
                       ? "Restricted"
-                      : selectedMeetup.attendees.includes(loggedInUser?.name)
+                      : (selectedMeetup.attendees || []).includes(loggedInUser?.name)
                       ? "Joined ✓"
+                      : (selectedMeetup.attendees ? selectedMeetup.attendees.length : 0) >= (selectedMeetup.maxParticipants || 10)
+                      ? "Meetup Full 🚫"
                       : "Join Meetup"}
                   </button>
                 )}
@@ -240,6 +272,18 @@ export default function MeetupPage() {
                 </div>
               </div>
 
+              {/* 🔢 خانة اختيار الحد الأقصى للمشاركين بشكل متناسق هندسياً */}
+              <div className="input-group">
+                <label>Max Participants Count</label>
+                <input 
+                  type="number" 
+                  min="2"
+                  max="50"
+                  value={formData.maxParticipants} 
+                  onChange={e => setFormData({...formData, maxParticipants: e.target.value})} 
+                />
+              </div>
+
               {/* قسم الدعوات بنظام السهم والبحث المتطابق مع الهوية البصرية */}
               <div className="prof-invite-section">
                 <div 
@@ -252,7 +296,6 @@ export default function MeetupPage() {
 
                 {showInviteDropdown && (
                   <div className="prof-dropdown-content">
-                    {/* حقل بحث مقتبس هندسياً من شريط بحث موقعكِ الأساسي */}
                     <div className="prof-search-wrapper">
                       <span className="prof-search-icon">🔍</span>
                       <input 
@@ -266,7 +309,7 @@ export default function MeetupPage() {
 
                     <div className="prof-users-grid">
                       {allUsers
-                        .filter(user => user.name.toLowerCase().includes(userSearchTerm.toLowerCase()))
+                        .filter(user => user.name?.toLowerCase().includes(userSearchTerm.toLowerCase()))
                         .map(user => {
                           const isSelected = formData.invitePeople.includes(user.name);
                           return (
@@ -276,14 +319,14 @@ export default function MeetupPage() {
                               onClick={() => handleToggleInvite(user.name)}
                             >
                               <div className="prof-avatar">
-                                {user.name.charAt(0).toUpperCase()}
+                                {user.name ? user.name.charAt(0).toUpperCase() : "U"}
                               </div>
                               <span className="prof-username">{user.name}</span>
                               {isSelected && <span className="prof-check-mark">✓</span>}
                             </div>
                           );
                         })}
-                      {allUsers.filter(user => user.name.toLowerCase().includes(userSearchTerm.toLowerCase())).length === 0 && (
+                      {allUsers.filter(user => user.name?.toLowerCase().includes(userSearchTerm.toLowerCase())).length === 0 && (
                         <p className="prof-no-users">No profiles match your search.</p>
                       )}
                     </div>
@@ -291,7 +334,6 @@ export default function MeetupPage() {
                 )}
               </div>
 
-              {/* أزرار التحكم - تحافظ على كلاسات التصميم الأصلي القديم 100% */}
               <div className="popup-action-btns" style={{ marginTop: "25px", paddingTop: "15px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
                 <button className="btn-cancel-popup" onClick={() => { setIsCreateModalOpen(false); setShowInviteDropdown(false); }}>
                   Close
@@ -312,7 +354,6 @@ export default function MeetupPage() {
             alert("You are not allowed to create meetups");
             return;
           }
-
           setIsCreateModalOpen(true);
         }}
       >
