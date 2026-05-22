@@ -335,10 +335,18 @@ const recommendedPlaces = placesData
     recommendationReason: getRecommendationReason(place),
   }))
   .filter((place) =>
-    userInterests.length > 0
-      ? place.recommendationScore > 0
-      : (place.rating || 0) >= 4
+    userInterests.length > 0 || viewedPlaces.length > 0
+      ? place.recommendationScore >=3
+      : (place.rating || 0) >= 4.5
   )
+  .filter(
+    (place) =>
+      !viewedPlaces.some(
+        (viewed) =>
+          (viewed._id || viewed.id) ===
+          (place._id || place.id)
+      )
+  ) 
   .sort((a, b) => {
     if (b.recommendationScore !== a.recommendationScore) {
       return b.recommendationScore - a.recommendationScore;
@@ -346,7 +354,7 @@ const recommendedPlaces = placesData
 
     return (b.rating || 0) - (a.rating || 0);
   })
-  .slice(0, 8);
+  .slice(0, 5);
 
   return (
     <div className="home-page-bg" style={{ position: "relative" }}>
@@ -388,13 +396,25 @@ const recommendedPlaces = placesData
           </div>
         </div>
 
-        {(aiRecommendations.length > 0 ? aiRecommendations : recommendedPlaces).length > 0 && (
+        {(aiRecommendations.length > 0 ? aiRecommendations : recommendedPlaces).filter((p) =>
+          `${p.name} ${p.location}`.toLowerCase().includes(search.toLowerCase())
+        ).length > 0 ? (
           <Section
             title="Recommended For You"
             items={(aiRecommendations.length > 0 ? aiRecommendations : recommendedPlaces).filter((p) =>
               `${p.name} ${p.location}`.toLowerCase().includes(search.toLowerCase())
             )}
-         />
+          />
+        ) : (
+          <div className="home-section">
+            <div className="home-section-header">
+              <h2>Recommended For You</h2>
+            </div>
+
+            <p className="empty-text">
+              No recommendations yet. Explore more places to improve suggestions ✨
+            </p>
+          </div>
         )}
 
         {categories.map((cat) => (
