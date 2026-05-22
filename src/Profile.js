@@ -6,6 +6,8 @@ import { auth } from "./firebase";
 import { signOut, deleteUser } from "firebase/auth";
 import { Menu } from "lucide-react";
 
+const api = axios; 
+
 function Profile() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -13,6 +15,7 @@ function Profile() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(""); 
   const [hostedCount, setHostedCount] = useState(0);
+  const [joinedCount, setJoinedCount] = useState(0); 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const [user, setUser] = useState({
@@ -48,8 +51,7 @@ function Profile() {
           return;
         }
 
-        // 🛠️ تم التعديل هنا لاستخدام axios مباشرة
-        const res = await axios.get(
+        const res = await api.get(
           `http://localhost:5000/api/users/profile/${userId}`,
           {
             headers: {
@@ -59,14 +61,12 @@ function Profile() {
         );
         if (res.data) {
           setUser(res.data);
-          // لا نحدث localStorage إلا إذا كان هذا بروفايلي أنا
           if (!id) {
             localStorage.setItem("user", JSON.stringify(res.data));
           }
         }
 
-        // 🛠️ تم التعديل هنا لاستخدام axios مباشرة
-        const meetupsRes = await axios.get(
+        const meetupsRes = await api.get(
           "http://localhost:5000/api/meetups",
           {
             headers: {
@@ -74,9 +74,17 @@ function Profile() {
             },
           }
         );
-        if (meetupsRes.data && userName) {
-          const myHostedMeetups = meetupsRes.data.filter(m => m.createdBy === userName);
-          setHostedCount(myHostedMeetups.length);
+        if (meetupsRes.data) {
+          if (userName) {
+            const myHostedMeetups = meetupsRes.data.filter(m => m.createdBy === userName);
+            setHostedCount(myHostedMeetups.length);
+          }
+
+          const myJoinedMeetups = meetupsRes.data.filter(m => 
+            (m.attendees && m.attendees.includes(userId)) || 
+            (m.attendees && m.attendees.includes(userName))
+          );
+          setJoinedCount(myJoinedMeetups.length);
         }
 
       } catch (err) {
@@ -86,10 +94,10 @@ function Profile() {
     
     fetchProfileAndStats();
   }, [navigate, id, token]);
-  const loggedUser = JSON.parse(localStorage.getItem("user"));
 
-  const isMyProfile =
-   !id || id === (loggedUser?.id || loggedUser?._id);
+  const loggedUser = JSON.parse(localStorage.getItem("user"));
+  const isMyProfile = !id || id === (loggedUser?.id || loggedUser?._id);
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -98,10 +106,56 @@ function Profile() {
     }
   };
 
-  const handleRemoveImage = () => {
-    setSelectedFile("REMOVE"); 
-    setImagePreview("REMOVE_PREVIEW"); 
-    setUser(prev => ({ ...prev, image: "" })); 
+  // 🛠️ استراتيجية الحذف الذكية: توليد صورة شفافة ورفعها لإنهاء تحكم السيرفر بالصورة القديمة
+  const handleRemoveImage = async () => {
+    if (!window.confirm("Are you sure you want to delete your profile photo permanently?")) return;
+
+    try {
+      // 1. صناعة صورة بيكسل واحد شفاف بصيغة PNG برمجياً وتحويلها لملف جاهز للرفع
+      const transparentPixelBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+      const response = await fetch(transparentPixelBase64);
+      const blob = await response.blob();
+      const transparentFile = new File([blob], "transparent_placeholder.png", { type: "image/png" });
+
+      // 2. إعداد الـ FormData لرفع الصورة الشفافة كملف حقيقي للسيرفر لكي يقبله مجبراً
+      const formData = new FormData();
+      formData.append("name", user.name);
+      formData.append("location", user.location);
+      formData.append("bio", user.bio);
+      formData.append("image", transparentFile); 
+
+      const res = await api.put(
+        `http://localhost:5000/api/users/profile/update/${user._id}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (res.data) {
+        // 3. تصفير الحقول محلياً فوراً
+        setSelectedFile(null);
+        setImagePreview("REMOVE_PREVIEW");
+        
+        let updatedUser = res.data.user || user;
+        // وضع وسم محلي للتعرف على الصورة الشفافة
+        updatedUser.image = "TRANSPARENT_DELETED"; 
+        
+        setUser(prev => ({ ...prev, image: "TRANSPARENT_DELETED" }));
+
+        const currentLocal = JSON.parse(localStorage.getItem("user")) || {};
+        currentLocal.image = "TRANSPARENT_DELETED";
+        localStorage.setItem("user", JSON.stringify(currentLocal));
+        
+        alert("Profile photo removed successfully! 🗑️");
+      }
+    } catch (err) {
+      console.error("Delete Image Error:", err);
+      alert("Could not remove the photo from server.");
+    }
   };
 
   const removePlace = async (placeId) => {
@@ -110,12 +164,9 @@ function Profile() {
 
       const updatedPlaces = user.savedPlaces.filter(p => p._id !== placeId);
       
-      // 🛠️ تم التعديل هنا لاستخدام axios مباشرة
-      const res = await axios.put(
+      const res = await api.put(
         `http://localhost:5000/api/users/profile/update/${user._id}`,
-        {
-          savedPlaces: updatedPlaces
-        },
+        { savedPlaces: updatedPlaces },
         {
            headers: {
               Authorization: `Bearer ${token}`,
@@ -142,14 +193,11 @@ function Profile() {
       formData.append("location", user.location);
       formData.append("bio", user.bio);
       
-      if (selectedFile === "REMOVE") {
-        formData.append("image", ""); 
-      } else if (selectedFile) {
+      if (selectedFile) {
         formData.append("image", selectedFile);
       }
 
-      // 🛠️ تم التعديل هنا لاستخدام axios مباشرة
-      const res = await axios.put(
+      const res = await api.put(
         `http://localhost:5000/api/users/profile/update/${user._id}`, 
         formData,
         {
@@ -161,12 +209,7 @@ function Profile() {
       );
 
       if (res.data.user) {
-        const updatedUser = res.data.user;
-        
-        if (selectedFile === "REMOVE") {
-          updatedUser.image = "";
-        }
-
+        let updatedUser = res.data.user;
         setUser(updatedUser);
         setIsEditing(false);
         setSelectedFile(null);
@@ -182,114 +225,117 @@ function Profile() {
     }
   };
 
+  // فحص ما إذا كانت الصورة صالحة أم أنها الصورة الشفافة المحذوفة
   const displayImage = imagePreview === "REMOVE_PREVIEW" ? "" : (imagePreview || user.image);
+  
   const hasValidImage = displayImage && 
                         displayImage.trim() !== "" && 
+                        displayImage !== "TRANSPARENT_DELETED" &&
+                        !displayImage.includes("transparent_placeholder.png") &&
                         !displayImage.includes("unsplash.com");
+
+  const finalImageSrc = hasValidImage 
+    ? (displayImage.startsWith("blob:") || displayImage.startsWith("http") ? displayImage : `http://localhost:5000${displayImage}`)
+    : "";
   
   const [menuOpen, setMenuOpen] = useState(false);
 
-const handleLogout = async () => {
-  await signOut(auth);
-  localStorage.clear();
-  navigate("/");
-};
-
-const handleDeleteAccount = async () => {
-  
-
-  try {
-    await axios.delete(
-      `http://localhost:5000/api/users/${user._id}`,
-      { 
-        headers: {
-           Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    if (auth.currentUser) {
-      await deleteUser(auth.currentUser);
-    }
-
+  const handleLogout = async () => {
+    await signOut(auth);
     localStorage.clear();
     navigate("/");
-  } catch (err) {
-    console.error(err);
-    alert("Failed to delete account.");
-  }
-};
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      await api.delete(
+        `http://localhost:5000/api/users/${user._id}`,
+        { 
+          headers: {
+             Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (auth.currentUser) {
+        await deleteUser(auth.currentUser);
+      }
+
+      localStorage.clear();
+      navigate("/");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete account.");
+    }
+  };
 
   return (
     <div style={containerStyle}>
       {isMyProfile && (
         <div style={{ position: "absolute", top: "25px", right: "25px", zIndex: 100 }}>
-  <button
-    onClick={() => setMenuOpen(!menuOpen)}
-    style={{
-      background: "rgba(255,255,255,0.08)",
-      border: "1px solid rgba(255,255,255,0.12)",
-      borderRadius: "12px",
-      width: "42px",
-      height: "42px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      cursor: "pointer",
-      color: "white",
-    }}
-  
-  >
-    <Menu size={20} />
-  </button>
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{
+              background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: "12px",
+              width: "42px",
+              height: "42px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              color: "white",
+            }}
+          >
+            <Menu size={20} />
+          </button>
 
-  {menuOpen && (
-    <div
-      style={{
-        position: "absolute",
-        top: "50px",
-        right: 0,
-        background: "#1e1b4b",
-        border: "1px solid rgba(255,255,255,0.1)",
-        borderRadius: "16px",
-        overflow: "hidden",
-        minWidth: "180px",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
-      }}
-    >
-      <button onClick={handleLogout} style={menuItemStyle}onMouseEnter={(e) => e.target.style.background = "rgba(255,255,255,0.08)"}onMouseLeave={(e) => e.target.style.background = "transparent"}>
-        Logout 
-      </button>
+          {menuOpen && (
+            <div
+              style={{
+                position: "absolute",
+                top: "50px",
+                right: 0,
+                background: "#1e1b4b",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: "16px",
+                overflow: "hidden",
+                minWidth: "180px",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+              }}
+            >
+              <button onClick={handleLogout} style={menuItemStyle}>
+                Logout 
+              </button>
 
-      <button
-        onClick={() => setShowDeleteModal(true)}
-        style={{
-          ...menuItemStyle,
-          color: "#ff6b6b",
-        }}
-        onMouseEnter={(e) => e.target.style.background = "rgba(255,255,255,0.08)"}
-        onMouseLeave={(e) => e.target.style.background = "transparent"}
-      >
-        Delete Account 
-      </button>
-    </div>
-  )}
-</div>
-  )}
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                style={{
+                  ...menuItemStyle,
+                  color: "#ff6b6b",
+                }}
+              >
+                Delete Account 
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       <div style={{ marginBottom: "20px" }}>
         <Navbar />
       </div>
 
       <div style={layoutWrapper}>
         
-        {/* LEFT COLUMN - Profile Card */}
+        {/* LEFT COLUMN */}
         <div style={leftColumn}>
           <div style={glassCard}>
             <div style={profileImageContainer}>
               
               {hasValidImage ? (
                 <img 
-                  src={displayImage} 
+                  src={finalImageSrc} 
                   alt="profile" 
                   style={profileImgStyle} 
                 />
@@ -344,12 +390,12 @@ const handleDeleteAccount = async () => {
 
           <div style={statsGrid}>
             <StatBox count={user.savedPlaces?.length || 0} label="Saved" />
-            <StatBox count={user.interests?.length || 0} label="Interests" />
+            <StatBox count={joinedCount} label="Joined" /> 
             <StatBox count={hostedCount} label="Hosted" /> 
           </div>
         </div>
 
-        {/* RIGHT COLUMN - Sections */}
+        {/* RIGHT COLUMN */}
         <div style={rightColumn}>
           <SectionBox title="About Me">
             <p style={bodyText}>{user.bio || "No bio added yet."}</p>
@@ -382,7 +428,7 @@ const handleDeleteAccount = async () => {
                           title="Remove Place"
                         >
                           ✕
-                       </button>
+                        </button>
                       )}
                     </div>
                     <div style={{ padding: "12px" }}>
@@ -401,30 +447,27 @@ const handleDeleteAccount = async () => {
       </div>
       
       {showDeleteModal && (
-  <div style={modalOverlayStyle}>
-    <div style={deleteModalStyle}>
-      <h2>Delete Account?</h2>
-      <p> Deleting your account will permanently remove
-          your profile, saved places, meetups, and all your data.</p>
+        <div style={modalOverlayStyle}>
+          <div style={deleteModalStyle}>
+            <h2>Delete Account?</h2>
+            <p> Deleting your account will permanently remove your profile, saved places, meetups, and all your data.</p>
 
-      <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
-        <button onClick={() => setShowDeleteModal(false)} style={cancelDeleteBtnStyle} onMouseEnter={(e) => {e.target.style.background = "rgba(255,255,255,0.15)";}}onMouseLeave={(e) => {e.target.style.background = "rgba(255,255,255,0.08)";}}>
-          Cancel
-        </button>
+            <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
+              <button onClick={() => setShowDeleteModal(false)} style={cancelDeleteBtnStyle}>
+                Cancel
+              </button>
 
-        <button onClick={handleDeleteAccount} style={confirmDeleteBtnStyle}onMouseEnter={(e) => { e.target.style.background = "#ef4444";}}onMouseLeave={(e) => {e.target.style.background = "#dc2626";}}>
-          Delete
-        </button>
-      </div>
+              <button onClick={handleDeleteAccount} style={confirmDeleteBtnStyle}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-)}
-    </div>
-  
   );
 }
 
-// Sub-components
 function StatBox({ count, label }) {
   return (
     <div style={statBoxStyle}>
@@ -451,11 +494,9 @@ const rightColumn = { width: "68%", display: "flex", flexDirection: "column", ga
 const glassCard = { background: "rgba(78, 33, 155, 0.6)", backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)", padding: "30px 24px", borderRadius: "24px", textAlign: "center", boxShadow: "0 15px 35px rgba(0,0,0,0.4)" };
 const profileImageContainer = { position: "relative", width: "130px", height: "130px", margin: "0 auto 20px" };
 const profileImgStyle = { width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover", border: "3px solid #ff6b00", boxShadow: "0 0 20px rgba(255,107,0,0.5)" };
-
 const cameraIconStyle = { position: "absolute", bottom: "5px", right: "5px", background: "#ff6b00", borderRadius: "50%", padding: "7px", cursor: "pointer", fontSize: "14px", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", zIndex: 3 };
 const deleteImageIconStyle = { position: "absolute", bottom: "5px", left: "5px", background: "#dc2626", border: "none", borderRadius: "50%", padding: "7px", cursor: "pointer", fontSize: "14px", color: "white", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", zIndex: 3 };
-
-const emptyAvatarStyle = { width: "100%", height: "100%", borderRadius: "50%", background: "rgba(255, 255, 255, 0.1)", border: "3px solid rgba(255, 255, 255, 0.2)", boxShadow: "0 0 15px rgba(255, 255, 255, 0.05)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "48px", color: "rgba(255, 255, 255, 0.4)" };
+const emptyAvatarStyle = { width: "100%", height: "100%", borderRadius: "50%", background: "rgba(255, 255, 255, 0.1)", border: "3px solid rgba(255, 255, 255, 0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "48px", color: "rgba(255, 255, 255, 0.4)" };
 const editFormStyle = { display: "flex", flexDirection: "column", gap: "12px", width: "100%", marginTop: "10px" };
 const inputStyle = { width: "100%", padding: "12px", borderRadius: "10px", background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none", boxSizing: "border-box" };
 const textareaStyle = { ...inputStyle, minHeight: "80px", resize: "none" };
@@ -474,62 +515,14 @@ const bodyText = { color: "rgba(255,255,255,0.8)", lineHeight: "1.7", margin: 0 
 const chipsWrap = { display: "flex", flexWrap: "wrap", gap: "10px" };
 const chipStyle = { padding: "8px 18px", borderRadius: "20px", background: "rgba(230,96,0,0.15)", border: "1px solid rgba(230,96,0,0.4)", color: "white", fontSize: "13px", fontWeight: "600" };
 const placesGrid = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "18px" };
-const placeCardStyle = { background: "rgba(0, 0, 0, 0.2)", borderRadius: "16px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", transition: "transform 0.3s ease", position: "relative" };
+const placeCardStyle = { background: "rgba(0, 0, 0, 0.2)", borderRadius: "16px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", position: "relative" };
 const placeImgStyle = { width: "100%", height: "130px", objectFit: "cover" };
 const placeLocStyle = { color: "rgba(255,255,255,0.6)", fontSize: "12px", margin: 0 };
-const removeBtnStyle = { position: "absolute", top: "8px", right: "8px", background: "rgba(255, 50, 50, 0.8)", color: "white", border: "none", borderRadius: "50%", width: "26px", height: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", boxShadow: "0 2px 5px rgba(0,0,0,0.3)", zIndex: 2, transition: "all 0.2s ease" };
-const menuItemStyle = {
-  width: "100%",
-  padding: "14px 18px",
-  background: "transparent",
-  border: "none",
-  color: "white",
-  textAlign: "left",
-  cursor: "pointer",
-  fontSize: "14px",
-  transition: "all 0.2s ease",
-};
-const modalOverlayStyle = {
-  position: "fixed",
-  inset: 0,
-  background: "rgba(0,0,0,0.75)",
-  backdropFilter: "blur(8px)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 9999,
-};
+const removeBtnStyle = { position: "absolute", top: "8px", right: "8px", background: "rgba(255, 50, 50, 0.8)", color: "white", border: "none", borderRadius: "50%", width: "26px", height: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", zIndex: 2 };
+const menuItemStyle = { width: "100%", padding: "14px 18px", background: "transparent", border: "none", color: "white", textAlign: "left", cursor: "pointer", fontSize: "14px" };
+const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 };
+const deleteModalStyle = { width: "90%", maxWidth: "420px", background: "#1e1b4b", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "22px", padding: "28px", color: "white", textAlign: "center" };
+const cancelDeleteBtnStyle = { flex: 1, padding: "12px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.08)", color: "white", cursor: "pointer" };
+const confirmDeleteBtnStyle = { flex: 1, padding: "12px", borderRadius: "12px", border: "none", background: "#dc2626", color: "white", cursor: "pointer", fontWeight: "bold" };
 
-const deleteModalStyle = {
-  width: "90%",
-  maxWidth: "420px",
-  background: "#1e1b4b",
-  border: "1px solid rgba(255,255,255,0.12)",
-  borderRadius: "22px",
-  padding: "28px",
-  color: "white",
-  textAlign: "center",
-  boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
-};
-
-const cancelDeleteBtnStyle = {
-  flex: 1,
-  padding: "12px",
-  borderRadius: "12px",
-  border: "1px solid rgba(255,255,255,0.15)",
-  background: "rgba(255,255,255,0.08)",
-  color: "white",
-  cursor: "pointer",
-};
-
-const confirmDeleteBtnStyle = {
-  flex: 1,
-  padding: "12px",
-  borderRadius: "12px",
-  border: "none",
-  background: "#dc2626",
-  color: "white",
-  cursor: "pointer",
-  fontWeight: "bold",
-};
 export default Profile;

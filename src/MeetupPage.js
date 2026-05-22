@@ -268,7 +268,7 @@ export default function MeetupPage() {
 
           <input
             type="text"
-            placeholder="Search by place..."
+            placeholder="Search by title or place..."
             className="main-search-input"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -278,9 +278,13 @@ export default function MeetupPage() {
 
       <div className="meetup-grid-layout">
         {(meetups || [])
-          .filter((m) =>
-            (m.title || "").toLowerCase().includes(searchTerm.toLowerCase())
-          )
+          .filter((m) => {
+            const query = searchTerm.toLowerCase();
+            const matchesTitle = (m.title || "").toLowerCase().includes(query);
+            const matchesLocation = (m.location || "").toLowerCase().includes(query);
+            // 💡 يتم هنا فحص التطابق مع العنوان أو المكان معاً
+            return matchesTitle || matchesLocation;
+          })
           .map((item) => {
             const totalParticipants = item.attendees ? item.attendees.length : 0;
             const maxLimit = item.maxParticipants || 10;

@@ -19,10 +19,7 @@ const DetailsPopup = ({ isOpen, onClose, activity }) => {
         </button>
 
         <div className="activity-popup-header">
-          <div className="activity-popup-icon">
-            {activity.icon || "📍"}
-          </div>
-
+          <div className="activity-popup-icon">{activity.icon || "📍"}</div>
           <h2>{activity.title}</h2>
           <p>ACTIVITY DETAILS</p>
         </div>
@@ -30,7 +27,6 @@ const DetailsPopup = ({ isOpen, onClose, activity }) => {
         <div className="activity-popup-sections">
           <div className="activity-popup-row">
             <span>📍</span>
-
             <div>
               <small>Location</small>
               <p>{activity.location}</p>
@@ -39,23 +35,18 @@ const DetailsPopup = ({ isOpen, onClose, activity }) => {
 
           <div className="activity-popup-row">
             <span>📅</span>
-
             <div>
               <small>Date & Time</small>
-
               <p>
-                {new Date(activity.date).toLocaleDateString()} •{" "}
-                {activity.time}
+                {new Date(activity.date).toLocaleDateString()} • {activity.time}
               </p>
             </div>
           </div>
 
           <div className="activity-popup-row">
             <span>👤</span>
-
             <div>
               <small>Hosted By</small>
-
               <p>
                 {typeof activity.createdBy === "string"
                   ? activity.createdBy
@@ -65,10 +56,7 @@ const DetailsPopup = ({ isOpen, onClose, activity }) => {
           </div>
         </div>
 
-        <button
-          className="activity-popup-main-btn"
-          onClick={onClose}
-        >
+        <button className="activity-popup-main-btn" onClick={onClose}>
           Close Details
         </button>
       </div>
@@ -93,12 +81,9 @@ const InviteCard = ({
 
       <div>
         <h3>{title || location}</h3>
-
         <p>
           Hosted by{" "}
-          {typeof createdBy === "string"
-            ? createdBy
-            : createdBy?.name}
+          {typeof createdBy === "string" ? createdBy : createdBy?.name}
         </p>
       </div>
     </div>
@@ -106,10 +91,7 @@ const InviteCard = ({
     <div className="invite-details">
       <div>
         <span>Date</span>
-
-        <strong>
-          {new Date(date).toLocaleDateString()}
-        </strong>
+        <strong>{new Date(date).toLocaleDateString()}</strong>
       </div>
 
       <div>
@@ -124,17 +106,11 @@ const InviteCard = ({
     </div>
 
     <div className="invite-actions">
-      <button
-        className="deny-btn"
-        onClick={() => onDeny(_id)}
-      >
+      <button className="deny-btn" onClick={() => onDeny(_id)}>
         ✕ Ignore
       </button>
 
-      <button
-        className="accept-btn"
-        onClick={() => onAccept(_id)}
-      >
+      <button className="accept-btn" onClick={() => onAccept(_id)}>
         ✓ Join
       </button>
     </div>
@@ -154,29 +130,22 @@ const ActivityCard = ({
   onLeave,
 }) => (
   <div className="activity-card">
-    <div className="activity-card-left-icon">
-      {icon || "⛺"}
-    </div>
+    <div className="activity-card-left-icon">{icon || "⛺"}</div>
 
     <div className="activity-card-content">
       <h4>{title}</h4>
 
       <p>
         Hosted by{" "}
-        {typeof createdBy === "string"
-          ? createdBy
-          : createdBy?.name}
+        {typeof createdBy === "string" ? createdBy : createdBy?.name}
       </p>
 
       <div className="activity-meta">
         <span>
-          📅 {new Date(date).toLocaleDateString()}{" "}
-          {time ? `• ${time}` : ""}
+          📅 {new Date(date).toLocaleDateString()} {time ? `• ${time}` : ""}
         </span>
 
-        <span>
-          👥 {attendees?.length || 0} people
-        </span>
+        <span>👥 {attendees?.length || 0} people</span>
       </div>
 
       <div className="activity-card-actions">
@@ -198,10 +167,7 @@ const ActivityCard = ({
           Activity Details
         </button>
 
-        <button
-          className="leave-btn"
-          onClick={() => onLeave(_id)}
-        >
+        <button className="leave-btn" onClick={() => onLeave(_id)}>
           Leave Activity
         </button>
       </div>
@@ -209,17 +175,11 @@ const ActivityCard = ({
   </div>
 );
 
-const NotificationCard = ({
-  notification,
-  onRead,
-  onDelete,
-}) => (
+const NotificationCard = ({ notification, onRead, onDelete }) => (
   <div className="invite-card">
     <div className="invite-card-top">
       <div className="invite-icon">
-        {notification.type === "delete"
-          ? "🗑️"
-          : "✏️"}
+        {notification.type === "delete" ? "🗑️" : "✏️"}
       </div>
 
       <div>
@@ -230,18 +190,12 @@ const NotificationCard = ({
 
     <div className="invite-actions">
       {!notification.isRead && (
-        <button
-          className="accept-btn"
-          onClick={() => onRead(notification._id)}
-        >
+        <button className="accept-btn" onClick={() => onRead(notification._id)}>
           ✓ Mark Read
         </button>
       )}
 
-      <button
-        className="deny-btn"
-        onClick={() => onDelete(notification._id)}
-      >
+      <button className="deny-btn" onClick={() => onDelete(notification._id)}>
         ✕ Remove
       </button>
     </div>
@@ -283,25 +237,14 @@ export default function ActivityPage() {
 
   const dashboardRef = useRef(null);
 
-  const loggedInUser = JSON.parse(
-    localStorage.getItem("user")
-  );
-
+  const loggedInUser = JSON.parse(localStorage.getItem("user"));
   const token = localStorage.getItem("token");
 
   const fetchRealData = useCallback(async () => {
     try {
-      const response = await axios.get(
-        "http://localhost:5000/api/meetups",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await axios.get("http://localhost:5000/api/meetups");
 
-      const allMeetups = response.data;
-
+      const allMeetups = Array.isArray(response.data) ? response.data : [];
       const userName = loggedInUser?.name;
 
       if (!userName) {
@@ -312,10 +255,7 @@ export default function ActivityPage() {
       }
 
       const joined = allMeetups.filter((m) => {
-        return (
-          m.createdBy === userName ||
-          m.attendees?.includes(userName)
-        );
+        return m.createdBy === userName || m.attendees?.includes(userName);
       });
 
       const targetedInvites = allMeetups.filter((m) => {
@@ -337,14 +277,12 @@ export default function ActivityPage() {
         setDashboardFocus(null);
       }
     } catch (err) {
-      console.error(
-        "Failed to load real activities:",
-        err
-      );
-
+      console.error("Failed to load real activities:", err);
+      setCurrentActivities([]);
+      setInvites([]);
       toast.error("Failed to load real activities.");
     }
-  }, [loggedInUser?.name, dashboardFocus, token]);
+  }, [loggedInUser?.name, dashboardFocus]);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -359,12 +297,9 @@ export default function ActivityPage() {
         `http://localhost:5000/api/notifications/${userName}`
       );
 
-      setNotifications(res.data);
+      setNotifications(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.error(
-        "Error fetching notifications:",
-        err
-      );
+      console.error("Error fetching notifications:", err);
     }
   }, [loggedInUser?.name]);
 
@@ -405,24 +340,13 @@ export default function ActivityPage() {
         fetchRealData();
       }
     } catch (err) {
-      console.error(
-        "Error joining activity:",
-        err
-      );
-
-      toast.error(
-        err.response?.data?.message ||
-          "Error joining activity."
-      );
+      console.error("Error joining activity:", err);
+      toast.error(err.response?.data?.message || "Error joining activity.");
     }
   };
 
   const handleLeaveActivity = async (id) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to leave this activity?"
-      )
-    ) {
+    if (!window.confirm("Are you sure you want to leave this activity?")) {
       return;
     }
 
@@ -439,9 +363,7 @@ export default function ActivityPage() {
         }
       );
 
-      toast.success(
-        "You left the activity successfully."
-      );
+      toast.success("You left the activity successfully.");
 
       if (dashboardFocus?._id === id) {
         setDashboardFocus(null);
@@ -449,15 +371,8 @@ export default function ActivityPage() {
 
       fetchRealData();
     } catch (err) {
-      console.error(
-        "Error leaving activity:",
-        err
-      );
-
-      toast.error(
-        err.response?.data?.message ||
-          "Error leaving activity."
-      );
+      console.error("Error leaving activity:", err);
+      toast.error(err.response?.data?.message || "Error leaving activity.");
     }
   };
 
@@ -467,30 +382,25 @@ export default function ActivityPage() {
         `http://localhost:5000/api/meetups/${id}/deny`,
         {
           userName: loggedInUser.name,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
 
       toast.success("Invite ignored.");
       fetchRealData();
     } catch (err) {
-      console.error(
-        "Error denying invite:",
-        err
-      );
-
-      toast.error(
-        err.response?.data?.message ||
-          "Error ignoring invite."
-      );
+      console.error("Error denying invite:", err);
+      toast.error(err.response?.data?.message || "Error ignoring invite.");
     }
   };
 
   const handleReadNotification = async (id) => {
     try {
-      await axios.put(
-        `http://localhost:5000/api/notifications/${id}/read`
-      );
-
+      await axios.put(`http://localhost:5000/api/notifications/${id}/read`);
       fetchNotifications();
     } catch (err) {
       toast.error("Error updating notification.");
@@ -499,19 +409,14 @@ export default function ActivityPage() {
 
   const handleDeleteNotification = async (id) => {
     try {
-      await axios.delete(
-        `http://localhost:5000/api/notifications/${id}`
-      );
-
+      await axios.delete(`http://localhost:5000/api/notifications/${id}`);
       fetchNotifications();
     } catch (err) {
       toast.error("Error removing notification.");
     }
   };
 
-  const unreadNotifications = notifications.filter(
-    (n) => !n.isRead
-  );
+  const unreadNotifications = notifications.filter((n) => !n.isRead);
 
   const statsData = [
     {
@@ -524,26 +429,21 @@ export default function ActivityPage() {
         },
         {
           label: "Confirmed",
-          value:
-            dashboardFocus?.attendees?.length || "0",
+          value: dashboardFocus?.attendees?.length || "0",
           icon: "✅",
         },
       ],
     },
-
     {
       title: "Status",
       items: [
         {
           label: "Date",
           value: dashboardFocus
-            ? new Date(
-                dashboardFocus.date
-              ).toLocaleDateString()
+            ? new Date(dashboardFocus.date).toLocaleDateString()
             : "-",
           icon: "📅",
         },
-
         {
           label: "Time",
           value: dashboardFocus?.time || "-",
@@ -551,7 +451,6 @@ export default function ActivityPage() {
         },
       ],
     },
-
     {
       title: "Location Details",
       items: [
@@ -560,7 +459,6 @@ export default function ActivityPage() {
           value: dashboardFocus?.location || "-",
           icon: "📍",
         },
-
         {
           label: "Weather",
           value: "24°C",
@@ -572,10 +470,7 @@ export default function ActivityPage() {
 
   return (
     <div className="activity-page-bg">
-      <Toaster
-        position="top-center"
-        reverseOrder={false}
-      />
+      <Toaster position="top-center" reverseOrder={false} />
 
       <DetailsPopup
         isOpen={isPopupOpen}
@@ -611,9 +506,7 @@ export default function ActivityPage() {
         )}
 
         <section className="activity-section">
-          <h3 className="section-heading">
-            Available Meetups (Invites)
-          </h3>
+          <h3 className="section-heading">Available Meetups (Invites)</h3>
 
           <div className="invites-scroll">
             {invites.length > 0 ? (
@@ -626,17 +519,13 @@ export default function ActivityPage() {
                 />
               ))
             ) : (
-              <p className="empty-text">
-                No new meetups found.
-              </p>
+              <p className="empty-text">No new meetups found.</p>
             )}
           </div>
         </section>
 
         <section className="activity-section">
-          <h3 className="section-heading">
-            Current Activity
-          </h3>
+          <h3 className="section-heading">Current Activity</h3>
 
           <div className="invites-scroll">
             {currentActivities.length > 0 ? (
@@ -650,28 +539,18 @@ export default function ActivityPage() {
               ))
             ) : (
               <p className="empty-text">
-                Your schedule is empty. Join an
-                activity!
+                Your schedule is empty. Join an activity!
               </p>
             )}
           </div>
         </section>
 
-        <section
-          className="activity-section"
-          ref={dashboardRef}
-        >
-          <h3 className="section-heading centered">
-            Dashboard Overview
-          </h3>
+        <section className="activity-section" ref={dashboardRef}>
+          <h3 className="section-heading centered">Dashboard Overview</h3>
 
           <div className="stats-scroll">
             {statsData.map((stat, index) => (
-              <StatCircle
-                key={index}
-                title={stat.title}
-                items={stat.items}
-              />
+              <StatCircle key={index} title={stat.title} items={stat.items} />
             ))}
           </div>
         </section>
