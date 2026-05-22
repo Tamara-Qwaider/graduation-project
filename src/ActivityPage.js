@@ -242,7 +242,14 @@ export default function ActivityPage() {
 
   const fetchRealData = useCallback(async () => {
     try {
-      const response = await axios.get("http://localhost:5000/api/meetups");
+      const response = await axios.get(
+       "http://localhost:5000/api/meetups",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       const allMeetups = Array.isArray(response.data) ? response.data : [];
       const userName = loggedInUser?.name;
