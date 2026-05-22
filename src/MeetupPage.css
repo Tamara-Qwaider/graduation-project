@@ -1037,6 +1037,44 @@
   border-radius: 10px;
 }
 
+.recommendation-section,
+.all-meetups-section {
+  width: 90%;
+  max-width: 1250px;
+  margin: 28px auto 0;
+}
+
+.meetup-section-title {
+  display: inline-block;
+
+  color: #ffffff;
+
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+
+  margin: 0 0 16px 0;
+
+  padding-left: 12px;
+
+  border-left: 4px solid #ff9f1c;
+
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.recommendation-grid,
+.all-meetups-grid {
+  margin-top: 0;
+}
+
+.empty-meetup-text {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  margin: 15px 0;
+}
 
 @keyframes fadeInDropdown {
   from { opacity: 0; transform: translateY(-5px); }
