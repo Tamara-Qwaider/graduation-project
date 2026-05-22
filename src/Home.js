@@ -16,6 +16,9 @@ export default function Home() {
 
   const [placesData, setPlacesData] = useState([]);
   const [aiRecommendations, setAiRecommendations] = useState([]);
+  const [viewedPlaces, setViewedPlaces] = useState(() => {
+  return JSON.parse(localStorage.getItem("viewedPlaces")) || [];
+  });
   
   // الحفاظ على حالة الأماكن من كائن المستخدم
   const [savedPlaces, setSavedPlaces] = useState(() => {
@@ -169,6 +172,7 @@ export default function Home() {
           ].slice(0, 10);
 
           localStorage.setItem("viewedPlaces", JSON.stringify(updatedViewed));
+          setViewedPlaces(updatedViewed);
           setCurrentImageIndex(0);
         }}
         className="home-card"
@@ -243,12 +247,29 @@ const userInterests = loggedUser?.interests || [];
 const cleanText = (text = "") =>
   text.toLowerCase().replace(/[^\w\s]/g, "").trim();
 
+
+
 const getRecommendationScore = (place) => {
   let score = 0;
 
   const placeCategory = cleanText(place.category);
   const placeName = cleanText(place.name);
   const placeDescription = cleanText(place.description);
+
+  viewedPlaces.forEach((viewed) => {
+    const viewedCategory = cleanText(viewed.category);
+
+    if (viewedCategory === placeCategory) {
+      score += 3;
+    }
+
+    if (
+      cleanText(viewed.location) ===
+      cleanText(place.location)
+    ) {
+      score += 1;
+    }
+  });
 
   userInterests.forEach((interest) => {
     const cleanInterest = cleanText(interest);

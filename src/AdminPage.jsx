@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { useMemo } from "react";
+
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState("places");
@@ -9,7 +11,7 @@ export default function AdminPage() {
 
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
+  const [token] = useState(() => localStorage.getItem("token"));
 
   const [places, setPlaces] = useState([]);
   const [meetups, setMeetups] = useState([]);
@@ -23,11 +25,23 @@ export default function AdminPage() {
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
-  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-  // الخطأ كان هنا (في السطر الذي يبدأ بـ :)
-const jsonAuthHeaders = token 
-  ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` } 
-  : { "Content-Type": "application/json" }; // تأكد من وجود القوس } ثم الفاصلة المنقوطة
+
+
+const authHeaders = useMemo(() => {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}, [token]);
+
+const jsonAuthHeaders = useMemo(() => {
+  return token
+    ? {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      }
+    : {
+        "Content-Type": "application/json",
+      };
+}, [token]);
+
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -62,8 +76,8 @@ const jsonAuthHeaders = token
         console.log("Error fetching categories", err);
       }
     };
-    if (token) fetchCategories();
-  }, [token]);
+    fetchCategories();
+  }, [authHeaders]);
 
   // Fetch Places
   useEffect(() => {
@@ -82,45 +96,29 @@ const jsonAuthHeaders = token
         console.log("Error fetching places", err);
       }
     };
-    if (token) fetchPlaces();
-  }, [token]);
+    fetchPlaces();
+  }, [token, authHeaders]);
 
-  // Fetch Meetups
-  useEffect(() => {
-    const fetchMeetups = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/api/meetups", { 
-          headers: token ? { Authorization: `Bearer ${token}` } : {} 
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          console.log(data.message || "Failed to fetch meetups");
-          return;
-        }
-        setMeetups(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.log("Error fetching meetups", err);
-      }
-    };
-    if (token) fetchMeetups();
-  }, [token]);
-
-  // دالة تحديث يدوي للميت اب يتم استدعاؤها بعد الحذف أو التعديل
-  const refreshMeetups = async () => {
+  const fetchMeetups = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/meetups", { 
-        headers: token ? { Authorization: `Bearer ${token}` } : {} 
+      const res = await fetch("http://localhost:5000/api/meetups", {
+        headers: authHeaders,
       });
+
       const data = await res.json();
-      if (res.ok) {
-        setMeetups(Array.isArray(data) ? data : []);
-      }
+
+      if (!res.ok) return;
+
+      setMeetups(Array.isArray(data) ? data : []);
     } catch (err) {
       console.log(err);
     }
-  };
+  }, [authHeaders]);
 
-  // Fetch Users
+  useEffect(() => {
+    fetchMeetups();
+  }, [fetchMeetups]);
+  const refreshMeetups = fetchMeetups;
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -137,8 +135,8 @@ const jsonAuthHeaders = token
         alert("Server error");
       }
     };
-    if (token) fetchUsers();
-  }, [token]);
+    fetchUsers();
+  }, [token, authHeaders]);
 
   // Filter Logic
   const filteredPlaces = places.filter((p) =>
@@ -233,59 +231,142 @@ const jsonAuthHeaders = token
       alert("Error deleting meetup");
     }
   };
+ const uploadToCloudinary = async (file) => {
+  const data = new FormData();
 
-  const handleAddPlace = async (newPlace) => {
-    const extraImages = (newPlace.imagesText || "")
-      .split("\n")
-      .map((url) => url.trim())
-      .filter(Boolean);
-    const allImages = [newPlace.mainImage, ...extraImages].filter(Boolean);
 
-    try {
-      const res = await fetch("http://localhost:5000/api/places", {
-        method: "POST",
-        headers: jsonAuthHeaders,
-        body: JSON.stringify({
-          name: newPlace.name,
-          category: newPlace.category || "Suggestions",
-          image: newPlace.mainImage,
-          location: newPlace.loc,
-          rating: Number(newPlace.rate),
-          description: newPlace.desc,
-          images: allImages,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.message || "Failed to add place");
-        return;
-      }
-      setPlaces([...places, data.place || data]);
-      setIsAddPlaceOpen(false);
-    } catch (err) {
-      alert("Server error");
+  data.append("file", file);
+  data.append("upload_preset", "places_images");
+
+  const res = await fetch(
+    "https://api.cloudinary.com/v1_1/dk5ygcizr/image/upload",
+    {
+      method: "POST",
+      body: data,
+
     }
-  };
+  );
 
+  const result = await res.json();
+
+  if (!res.ok) {
+    throw new Error(result.error?.message || "Cloudinary upload failed");
+  }
+
+  return result.secure_url;
+};
+
+const handleAddPlace = async (newPlace) => {
+  try {
+    if (
+      !newPlace.name ||
+      !newPlace.category ||
+      !newPlace.loc ||
+      !newPlace.rate ||
+      !newPlace.phone ||
+      !newPlace.desc ||
+      !newPlace.mainImageFile
+    ) {
+      alert("Please fill all fields and upload the main image.");
+      return;
+    }
+    let mainImageUrl = "";
+
+    if (newPlace.mainImageFile) {
+      mainImageUrl = await uploadToCloudinary(newPlace.mainImageFile);
+    }
+
+    const extraImageUrls = [];
+
+    if (newPlace.extraImageFiles?.length > 0) {
+      for (const file of newPlace.extraImageFiles) {
+        const url = await uploadToCloudinary(file);
+        extraImageUrls.push(url);
+      }
+    }
+
+const allImages = [mainImageUrl, ...extraImageUrls].filter(Boolean);
+
+    const res = await fetch("http://localhost:5000/api/places", {
+      method: "POST",
+      headers: jsonAuthHeaders,
+      body: JSON.stringify({
+        name: newPlace.name,
+        category: newPlace.category || "Suggestions",
+        image: mainImageUrl,
+        location: newPlace.loc,
+        rating: Number(newPlace.rate),
+        description: newPlace.desc,
+        images: allImages,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.message || "Failed to add place");
+      return;
+    }
+
+    setPlaces((prev) => [...prev, data.place]);
+    setIsAddPlaceOpen(false);
+  } catch (err) {
+    alert(err.message || "Server error");
+  }
+};
   const handleUpdatePlace = async (updatedPlace) => {
-    try {
-      const res = await fetch(`http://localhost:5000/api/places/${updatedPlace._id}`, {
+  try {
+    let imageUrl = updatedPlace.image || updatedPlace.img;
+
+    if (updatedPlace.imageFile) {
+      imageUrl = await uploadToCloudinary(updatedPlace.imageFile);
+    }
+    const newExtraImageUrls = [];
+    if (updatedPlace.newExtraImageFiles?.length > 0) {
+      for (const file of updatedPlace.newExtraImageFiles) {
+        const url = await uploadToCloudinary(file);
+        newExtraImageUrls.push(url);
+      }
+    }
+    const updatedImages = [
+      imageUrl,
+      ...(updatedPlace.images || []).filter((url) => url !== imageUrl),
+      ...newExtraImageUrls,
+    ];
+
+    const res = await fetch(
+      `http://localhost:5000/api/places/${updatedPlace._id}`,
+      {
         method: "PUT",
         headers: jsonAuthHeaders,
-        body: JSON.stringify(updatedPlace),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.message || "failed to update");
-        return;
+        body: JSON.stringify({
+          ...updatedPlace,
+          image: imageUrl,
+          images: updatedImages,
+          rating: Number(updatedPlace.rate),
+          description: updatedPlace.desc,
+        }),
       }
-      const updatedObj = data.place || data;
-      setPlaces(places.map((p) => (p._id === updatedObj._id ? updatedObj : p)));
-      setIsEditPlaceOpen(false);
-    } catch (err) {
-      alert("Server error");
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.message || "failed to update");
+      return;
     }
-  };
+
+    setPlaces(
+      places.map((p) =>
+        p._id === data.place._id ? data.place : p
+      )
+    );
+
+    setIsEditPlaceOpen(false);
+  } catch (err) {
+    alert(err.message || "Server error");
+  }
+};
 
   return (
     <div className="min-h-screen bg-[#060b1a] text-white font-sans overflow-x-hidden">
@@ -368,9 +449,16 @@ const jsonAuthHeaders = token
                     body: JSON.stringify({ name }),
                   });
                   const data = await res.json();
-                  if (!res.ok) { alert(data.message); return; }
-                  setCategories([...categories, data.category || data]);
-                } catch (err) { alert("Server error"); }
+
+                  if (!res.ok) {
+                    alert(data.message);
+                    return;
+                  }
+
+                  setCategories((prev) => [...prev, data.category]);
+                } catch (err) {
+                  alert("Server error");
+                }
               }}
               onDeleteCategory={async (id) => {
                 try {
@@ -591,7 +679,22 @@ const UsersSection = ({ data, onRestrict, onBlock }) => (
 
 const AddPlaceModal = ({ isOpen, onClose, onAdd, categories }) => {
   const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: "", mainImage: "", imagesText: "", loc: "", rate: "", phone: "", desc: "", category: "" });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    mainImage: "",
+    imagesText: "",
+    mainImageFile: null,
+    extraImageFiles: [],
+    loc: "",
+    rate: "",
+    phone: "",
+    desc: "",
+    category: "",
+  });
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -600,32 +703,173 @@ const AddPlaceModal = ({ isOpen, onClose, onAdd, categories }) => {
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="relative bg-[#161e31] w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden border border-white/10">
             <div className="px-8 pt-8 pb-4"><h2 className="text-3xl font-black uppercase text-[#ff6b35]">Add New Place</h2></div>
             <div className="px-8 pb-8 space-y-3">
-              <input type="text" placeholder="Main Image URL" onChange={(e) => setFormData({ ...formData, mainImage: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
-              <div className="flex justify-start"><button type="button" onClick={() => setIsImagesModalOpen(true)} className="border border-[#ff6b35]/40 text-[#ff6b35] px-4 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-[#ff6b35]/10 transition-all">+ More Images</button></div>
-              <input type="text" placeholder="Place Name" onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
-              <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] text-gray-300">
-                <option value="" className="text-gray-500">Select Category</option>
-                {categories.map((c) => (<option key={c._id || c.id} value={c.name} className="text-white">{c.name}</option>))}
-              </select>
-              <input type="text" placeholder="Location" onChange={(e) => setFormData({ ...formData, loc: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
-              <div className="grid grid-cols-2 gap-4">
-                <input type="text" placeholder="Rate (e.g. 4.5)" onChange={(e) => setFormData({ ...formData, rate: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none" />
-                <input type="tel" placeholder="Phone Number" onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none" />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    mainImageFile: e.target.files[0],
+                  })
+                }
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
+              />
+
+              <div className="flex justify-start">
+                <button
+                  type="button"
+                  onClick={() => setIsImagesModalOpen(true)}
+                  className="border border-[#ff6b35]/40 text-[#ff6b35] px-4 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-[#ff6b35]/10 transition-all"
+                >
+                  + More Images
+                </button>
               </div>
-              <textarea placeholder="About the place..." rows="3" onChange={(e) => setFormData({ ...formData, desc: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none" />
+
+              <input
+                required
+                type="text"
+                placeholder="Place Name"
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
+              />
+
+              <select
+                required
+                value={formData.category}
+                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] text-gray-300"
+              >
+                <option value="" className="text-gray-500">
+                  Select Category
+                </option>
+
+                {categories.map((c) => (
+                  <option key={c._id} value={c.name} className="text-white">
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                required
+                type="text"
+                placeholder="Location"
+                onChange={(e) => setFormData({ ...formData, loc: e.target.value })}
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  placeholder="Rate (0 - 5)"
+                  onChange={(e) => setFormData({ ...formData, rate: e.target.value })}
+                  className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none"
+                />
+
+                <input
+                  
+                  required
+                  type="tel"
+                  placeholder="Phone Number"
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none"
+                />
+              </div>
+
+              <textarea
+                required
+                placeholder="About the place..."
+                rows="3"
+                onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none"
+              />
+
             </div>
             <div className="flex gap-4 p-8 bg-black/20">
-              <button onClick={onClose} className="flex-1 border-2 border-white/5 py-4 rounded-2xl font-black uppercase text-xs hover:bg-white/5 transition-all">Cancel</button>
-              <button onClick={() => onAdd(formData)} className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-black uppercase text-xs shadow-lg">Add</button>
+              <button
+                onClick={onClose}
+                className="flex-1 border-2 border-white/5 py-4 rounded-2xl font-black uppercase text-xs hover:bg-white/5 transition-all"
+              >
+                Cancel
+              </button>
+
+              <button
+                disabled={isSubmitting}
+                onClick={async () => {
+                  if (isSubmitting) return;
+
+                  setIsSubmitting(true);
+                  await onAdd(formData);
+                  setIsSubmitting(false);
+                }}
+                className={`flex-1 py-4 rounded-2xl font-black uppercase text-xs shadow-lg ${
+                  isSubmitting
+                    ? "bg-gray-500 cursor-not-allowed"
+                    : "bg-[#ff6b35]"
+                }`}
+              >
+                {isSubmitting ? "Uploading..." : "Add"}
+              </button>
             </div>
           </motion.div>
           <AnimatePresence>
             {isImagesModalOpen && (
               <div className="fixed inset-0 z-[180] flex items-center justify-center p-6">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsImagesModalOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-md" />
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 border border-white/10 shadow-2xl">
-                  <h3 className="text-2xl font-black uppercase text-[#ff6b35] mb-4">Extra Images</h3>
-                  <textarea value={formData.imagesText} placeholder="One image URL per line" rows="6" onChange={(e) => setFormData({ ...formData, imagesText: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none" />
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsImagesModalOpen(false)}
+                  className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                />
+
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 border border-white/10 shadow-2xl"
+                >
+                  <h3 className="text-2xl font-black uppercase text-[#ff6b35] mb-4">
+                    Extra Images
+                  </h3>
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        extraImageFiles: [
+                          ...formData.extraImageFiles,
+                          ...Array.from(e.target.files),
+                        ],
+                      })
+                    }
+                    className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
+                  />
+                  {formData.extraImageFiles.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-sm text-[#ff6b35] font-bold">
+                        {formData.extraImageFiles.length} extra images selected
+                     </p>
+
+                     {formData.extraImageFiles.map((file, index) => (
+                        <div
+                          key={index}
+                          className="bg-[#060b1a] px-4 py-3 rounded-xl text-sm text-gray-300"
+                        >
+                        Extra Image {index + 1}: {file.name}
+                       </div>
+                     ))}
+                   </div>
+                  )}
+
+
                   <div className="flex gap-4 mt-6">
                     <button onClick={() => setIsImagesModalOpen(false)} className="flex-1 border border-white/10 py-3 rounded-xl font-black uppercase text-xs hover:bg-white/5">Cancel</button>
                     <button onClick={() => setIsImagesModalOpen(false)} className="flex-1 bg-[#ff6b35] py-3 rounded-xl font-black uppercase text-xs">Done</button>
@@ -759,7 +1003,21 @@ const RestrictUserModal = ({ isOpen, onClose, user, onSave }) => {
 
 const EditPlaceModal = ({ isOpen, onClose, place, onSave }) => {
   const [isImagesModalOpen, setIsImagesModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ name: "", loc: "", phone: "", desc: "", img: "", imagesText: "", rate: "" });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    loc: "",
+    phone: "",
+    desc: "",
+    img: "",
+    imageFile: null,
+    imagesText: "",
+    newExtraImageFiles: [],
+    rate: "",
+  });
+
   useEffect(() => {
     if (place) {
       const mainImage = place.image || place.img || "";
@@ -770,6 +1028,7 @@ const EditPlaceModal = ({ isOpen, onClose, place, onSave }) => {
         phone: place.phone || "",
         desc: place.desc || place.description || "",
         img: mainImage,
+        newExtraImageFiles: [],
         imagesText: imagesArray.join("\n"),
         rate: place.rate || place.rating || "",
       });
@@ -778,7 +1037,18 @@ const EditPlaceModal = ({ isOpen, onClose, place, onSave }) => {
   const handleSave = () => {
     const imagesFromPopup = formData.imagesText.split("\n").map((url) => url.trim()).filter(Boolean);
     const allImages = [formData.img, ...imagesFromPopup.filter((url) => url !== formData.img)].filter(Boolean);
-    onSave({ ...place, ...formData, image: formData.img, images: allImages, rating: Number(formData.rate), description: formData.desc });
+
+
+    onSave({
+      ...place,
+      ...formData,
+      image: formData.img,
+      images: allImages,
+      newExtraImageFiles: formData.newExtraImageFiles,
+      rating: Number(formData.rate),
+      description: formData.desc,
+    });
+
   };
   return (
     <AnimatePresence>
@@ -788,28 +1058,203 @@ const EditPlaceModal = ({ isOpen, onClose, place, onSave }) => {
           <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 shadow-2xl">
             <h2 className="text-xl font-black uppercase mb-6 text-[#ff6b35]">Edit Place</h2>
             <div className="space-y-4">
-              <input type="text" value={formData.img} placeholder="Main Image URL" onChange={(e) => setFormData({ ...formData, img: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
-              <div className="flex justify-start"><button type="button" onClick={() => setIsImagesModalOpen(true)} className="border border-[#ff6b35]/40 text-[#ff6b35] px-4 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-[#ff6b35]/10 transition-all">+ Edit Extra Images</button></div>
-              <input type="text" value={formData.name} placeholder="Place Name" onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
-              <input type="text" value={formData.loc} placeholder="Location" onChange={(e) => setFormData({ ...formData, loc: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]" />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    imageFile: e.target.files[0],
+                  })
+                }
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
+              />
+
+              <div className="flex justify-start">
+                <button
+                  type="button"
+                  onClick={() => setIsImagesModalOpen(true)}
+                  className="border border-[#ff6b35]/40 text-[#ff6b35] px-4 py-2 rounded-xl font-black uppercase text-[10px] hover:bg-[#ff6b35]/10 transition-all"
+                >
+                  + Edit Extra Images
+                </button>
+              </div>
+
+              <input
+                type="text"
+                value={formData.name}
+                placeholder="Place Name"
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
+              />
+
+              <input
+                type="text"
+                value={formData.loc}
+                placeholder="Location"
+                onChange={(e) => setFormData({ ...formData, loc: e.target.value })}
+                className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
+              />
+
               <div className="grid grid-cols-2 gap-4">
-                <input type="text" value={formData.rate} placeholder="Rate" onChange={(e) => setFormData({ ...formData, rate: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none" />
-                <input type="tel" value={formData.phone} placeholder="Phone Number" onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none" />
+                <input
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  type="number"
+                  value={formData.rate}
+                  placeholder="Rate (0 - 5)"
+                  onChange={(e) => setFormData({ ...formData, rate: e.target.value })}
+                  className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none"
+                />
+
+                <input
+                  
+                  type="tel"
+                  value={formData.phone}
+                  placeholder="Phone Number"
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none"
+                />
+
               </div>
               <textarea value={formData.desc} placeholder="About..." rows="3" onChange={(e) => setFormData({ ...formData, desc: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none" />
             </div>
             <div className="flex gap-4 mt-6">
-              <button onClick={onClose} className="flex-1 border border-white/5 py-4 rounded-2xl font-black uppercase text-xs hover:bg-white/5">Cancel</button>
-              <button onClick={handleSave} className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-black uppercase text-xs shadow-lg">Save</button>
+              <button
+                onClick={onClose}
+                className="flex-1 border border-white/5 py-4 rounded-2xl font-black uppercase text-xs hover:bg-white/5"
+              >
+                Cancel
+              </button>
+
+              <button
+                disabled={isSubmitting}
+                onClick={async () => {
+                  if (isSubmitting) return;
+
+                  setIsSubmitting(true);
+                  await handleSave();
+                  setIsSubmitting(false);
+                }}
+                className={`flex-1 py-4 rounded-2xl font-black uppercase text-xs shadow-lg ${
+                  isSubmitting
+                    ? "bg-gray-500 cursor-not-allowed"
+                    : "bg-[#ff6b35]"
+                }`}
+              >
+                {isSubmitting ? "Saving..." : "Save"}
+              </button>
+
             </div>
           </motion.div>
           <AnimatePresence>
             {isImagesModalOpen && (
               <div className="fixed inset-0 z-[180] flex items-center justify-center p-6">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsImagesModalOpen(false)} className="absolute inset-0 bg-black/60 backdrop-blur-md" />
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 border border-white/10 shadow-2xl">
-                  <h3 className="text-2xl font-black uppercase text-[#ff6b35] mb-4">Edit Extra Images</h3>
-                  <textarea value={formData.imagesText} placeholder="One image URL per line" rows="6" onChange={(e) => setFormData({ ...formData, imagesText: e.target.value })} className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35] resize-none" />
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setIsImagesModalOpen(false)}
+                  className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                />
+
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="relative bg-[#161e31] w-full max-w-md rounded-[2rem] p-8 border border-white/10 shadow-2xl"
+                >
+                  <h3 className="text-2xl font-black uppercase text-[#ff6b35] mb-4">
+                    Edit Extra Images
+                  </h3>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        newExtraImageFiles: [
+                          ...formData.newExtraImageFiles,
+                          ...Array.from(e.target.files),
+                        ],
+                      })
+                    }
+                    className="w-full bg-[#060b1a] p-4 rounded-2xl border-none outline-none focus:ring-2 focus:ring-[#ff6b35]"
+                  />
+
+                  {formData.newExtraImageFiles.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      <p className="text-sm text-[#ff6b35] font-bold">
+                        {formData.newExtraImageFiles.length} new images selected
+                      </p>
+
+                      {formData.newExtraImageFiles.map((file, index) => (
+                        <div
+                          key={index}
+                          className="bg-[#060b1a] px-4 py-3 rounded-xl text-sm text-gray-300"
+                        >
+                          New Extra Image {index + 1}: {file.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                    {formData.imagesText
+                      .split("\n")
+                      .map((url) => url.trim())
+                      .filter(Boolean)
+                      .map((url, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-3 bg-[#060b1a] p-3 rounded-2xl"
+                        >
+                          <img
+                            src={url}
+                            alt={`img-${index + 1}`}
+                            className="w-16 h-16 object-cover rounded-xl"
+                         />
+
+                         <span className="flex-1 text-sm text-gray-300">
+                            {index === 0
+                              ? "Main Image"
+                              : `Extra Image ${index}`}
+                         </span>
+
+                         {index !== 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedImages = formData.imagesText
+                                  .split("\n")
+                                  .map((x) => x.trim())
+                                  .filter(Boolean)
+                                  .filter((_, i) => i !== index);
+
+                                setFormData({
+                                  ...formData,
+                                  imagesText: updatedImages.join("\n"),
+                                });
+                              }}
+                                className="bg-red-600 px-3 py-2 rounded-xl text-xs font-black"
+                              >
+                                Delete
+                              </button>
+                          )}
+                        </div>
+                      ))}
+
+                      {formData.imagesText
+                        .split("\n")
+                        .map((url) => url.trim())
+                        .filter(Boolean).length === 0 && (
+                          <p className="text-gray-400 text-sm">
+                            No extra images.
+                          </p>
+                        )}
+                  </div>
                   <div className="flex gap-4 mt-6">
                     <button onClick={() => setIsImagesModalOpen(false)} className="flex-1 border border-white/10 py-3 rounded-xl font-black uppercase text-xs hover:bg-white/5">Cancel</button>
                     <button onClick={() => setIsImagesModalOpen(false)} className="flex-1 bg-[#ff6b35] py-3 rounded-xl font-black uppercase text-xs">Done</button>
