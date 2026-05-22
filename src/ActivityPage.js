@@ -240,6 +240,37 @@ export default function ActivityPage() {
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
   const token = localStorage.getItem("token");
 
+  const getMeetupDateTime = useCallback((meetup) => {
+    if (meetup?.expiresAt) {
+      return new Date(meetup.expiresAt);
+    }
+
+    if (meetup?.date && meetup?.time) {
+      return new Date(`${meetup.date}T${meetup.time}`);
+    }
+
+    return null;
+  }, []);
+
+  const isMeetupActive = useCallback(
+    (meetup) => {
+      if (!meetup) return false;
+
+      if (meetup.status === "cancelled" || meetup.status === "expired") {
+        return false;
+      }
+
+      const meetupDateTime = getMeetupDateTime(meetup);
+
+      if (!meetupDateTime || isNaN(meetupDateTime.getTime())) {
+        return true;
+      }
+
+      return meetupDateTime > new Date();
+    },
+    [getMeetupDateTime]
+  );
+
   const fetchRealData = useCallback(async () => {
     try {
       const response = await axios.get(
@@ -252,6 +283,8 @@ export default function ActivityPage() {
       );
 
       const allMeetups = Array.isArray(response.data) ? response.data : [];
+      const activeMeetups = allMeetups.filter(isMeetupActive);
+
       const userName = loggedInUser?.name;
 
       if (!userName) {
@@ -261,11 +294,11 @@ export default function ActivityPage() {
         return;
       }
 
-      const joined = allMeetups.filter((m) => {
+      const joined = activeMeetups.filter((m) => {
         return m.createdBy === userName || m.attendees?.includes(userName);
       });
 
-      const targetedInvites = allMeetups.filter((m) => {
+      const targetedInvites = activeMeetups.filter((m) => {
         return (
           m.createdBy !== userName &&
           !m.attendees?.includes(userName) &&
@@ -283,13 +316,19 @@ export default function ActivityPage() {
       if (joined.length === 0) {
         setDashboardFocus(null);
       }
+
+      if (dashboardFocus && !isMeetupActive(dashboardFocus)) {
+        setDashboardFocus(joined[0] || null);
+        setSelectedActivity(null);
+        setIsPopupOpen(false);
+      }
     } catch (err) {
       console.error("Failed to load real activities:", err);
       setCurrentActivities([]);
       setInvites([]);
       toast.error("Failed to load real activities.");
     }
-  }, [loggedInUser?.name, dashboardFocus]);
+  }, [loggedInUser?.name, dashboardFocus, isMeetupActive]);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -315,7 +354,36 @@ export default function ActivityPage() {
     fetchNotifications();
   }, [fetchRealData, fetchNotifications]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentActivities((prev) => prev.filter(isMeetupActive));
+      setInvites((prev) => prev.filter(isMeetupActive));
+
+      setDashboardFocus((prev) => {
+        if (prev && !isMeetupActive(prev)) return null;
+        return prev;
+      });
+
+      setSelectedActivity((prev) => {
+        if (prev && !isMeetupActive(prev)) {
+          setIsPopupOpen(false);
+          return null;
+        }
+
+        return prev;
+      });
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [isMeetupActive]);
+
   const handleDetailsClick = (activity) => {
+    if (!isMeetupActive(activity)) {
+      toast.error("This activity has already ended.");
+      fetchRealData();
+      return;
+    }
+
     setSelectedActivity(activity);
     setIsPopupOpen(true);
     setDashboardFocus(activity);
@@ -349,6 +417,7 @@ export default function ActivityPage() {
     } catch (err) {
       console.error("Error joining activity:", err);
       toast.error(err.response?.data?.message || "Error joining activity.");
+      fetchRealData();
     }
   };
 

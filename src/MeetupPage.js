@@ -1,4 +1,11 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
+
 import Navbar from "./Navbar";
 import axios from "axios";
 import "./MeetupPage.css";
@@ -16,7 +23,7 @@ export default function MeetupPage() {
     time: "",
     invitePeople: [],
     maxParticipants: 10,
-    notes: ""
+    notes: "",
   };
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -30,6 +37,7 @@ export default function MeetupPage() {
   const [allUsers, setAllUsers] = useState([]);
 
   const participantsRef = useRef(null);
+
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
   const token = localStorage.getItem("token");
 
@@ -39,54 +47,130 @@ export default function MeetupPage() {
   const canJoinMeetups =
     loggedInUser?.permissions?.joinMeetups === false ? false : true;
 
-  const getPersonName = (person) => {
+  const userInterests = useMemo(() => {
+    const interests =
+      loggedInUser?.interests ||
+      loggedInUser?.interest ||
+      loggedInUser?.categories ||
+      [];
+
+    return Array.isArray(interests) ? interests : [interests];
+  }, [loggedInUser]);
+
+  const getPersonName = useCallback((person) => {
     if (!person) return "";
     if (typeof person === "string") return person;
     return person.name || person.userName || "";
-  };
+  }, []);
 
-  const isCurrentUserInMeetup = (meetup) => {
-    const userName = loggedInUser?.name;
-    if (!userName) return false;
-
-    return meetup?.attendees?.some((person) => getPersonName(person) === userName);
-  };
-
-  const isCurrentUserCreator = (meetup) => {
-    const userName = loggedInUser?.name;
-    const userId = loggedInUser?.id || loggedInUser?._id;
-
-    if (!meetup?.createdBy) return false;
-
-    if (typeof meetup.createdBy === "string") {
-      return meetup.createdBy === userName;
+  const getMeetupDateTime = useCallback((meetup) => {
+    if (meetup?.expiresAt) {
+      return new Date(meetup.expiresAt);
     }
 
-    return meetup.createdBy?.id === userId || meetup.createdBy?._id === userId || meetup.createdBy?.name === userName;
-  };
+    if (!meetup?.date) return null;
+
+    return new Date(`${meetup.date}T${meetup.time || "00:00"}`);
+  }, []);
+
+  const isMeetupExpired = useCallback(
+    (meetup) => {
+      if (meetup?.status === "expired" || meetup?.status === "cancelled") {
+        return true;
+      }
+
+      const meetupDateTime = getMeetupDateTime(meetup);
+
+      if (!meetupDateTime || isNaN(meetupDateTime.getTime())) {
+        return false;
+      }
+
+      return meetupDateTime < new Date();
+    },
+    [getMeetupDateTime]
+  );
+
+  const isCurrentUserInMeetup = useCallback(
+    (meetup) => {
+      const userName = loggedInUser?.name;
+      if (!userName) return false;
+
+      return meetup?.attendees?.some(
+        (person) => getPersonName(person) === userName
+      );
+    },
+    [loggedInUser?.name, getPersonName]
+  );
+
+  const isCurrentUserCreator = useCallback(
+    (meetup) => {
+      const userName = loggedInUser?.name;
+      const userId = loggedInUser?.id || loggedInUser?._id;
+
+      if (!meetup?.createdBy) return false;
+
+      if (typeof meetup.createdBy === "string") {
+        return meetup.createdBy === userName;
+      }
+
+      return (
+        meetup.createdBy?.id === userId ||
+        meetup.createdBy?._id === userId ||
+        meetup.createdBy?.name === userName
+      );
+    },
+    [loggedInUser?.id, loggedInUser?._id, loggedInUser?.name]
+  );
+
+  const getInterestScore = useCallback(
+    (meetup) => {
+      if (!userInterests.length) return 0;
+
+      const meetupText = `
+        ${meetup.title || ""}
+        ${meetup.location || ""}
+        ${meetup.notes || ""}
+        ${meetup.category || ""}
+        ${meetup.type || ""}
+      `.toLowerCase();
+
+      return userInterests.reduce((score, interest) => {
+        const word = String(interest).toLowerCase().trim();
+        if (!word) return score;
+
+        return meetupText.includes(word) ? score + 50 : score;
+      }, 0);
+    },
+    [userInterests]
+  );
 
   const fetchMeetups = useCallback(async () => {
     try {
       const res = await fetch("http://localhost:5000/api/meetups", {
         headers: {
-          Authorization: `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       const data = await res.json();
-      setMeetups(Array.isArray(data) ? data : []);
+
+      const activeMeetups = Array.isArray(data)
+        ? data.filter((meetup) => !isMeetupExpired(meetup))
+        : [];
+
+      setMeetups(activeMeetups);
     } catch (err) {
       console.error("Fetch error:", err);
       setMeetups([]);
     }
-  }, [token]);
+  }, [token, isMeetupExpired]);
 
   const fetchUsers = useCallback(async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/users", {
         headers: {
-          Authorization: `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       const others = res.data.filter((u) => u.name !== loggedInUser?.name);
@@ -102,15 +186,104 @@ export default function MeetupPage() {
   }, [fetchMeetups, fetchUsers]);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      setMeetups((prev) => prev.filter((meetup) => !isMeetupExpired(meetup)));
+
+      setSelectedMeetup((prev) => {
+        if (prev && isMeetupExpired(prev)) return null;
+        return prev;
+      });
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [isMeetupExpired]);
+
+  useEffect(() => {
     if (location.state?.openCreate && location.state?.place) {
       setIsCreateModalOpen(true);
 
       setFormData((prev) => ({
         ...prev,
-        placeName: location.state.place.name || ""
+        placeName: location.state.place.name || "",
       }));
     }
   }, [location.state]);
+
+  const recommendedForYou = useMemo(() => {
+    return [...meetups]
+      .filter((meetup) => !isMeetupExpired(meetup))
+      .filter((meetup) => !isCurrentUserInMeetup(meetup))
+      .map((meetup) => ({
+        ...meetup,
+        recommendationScore: getInterestScore(meetup),
+      }))
+      .filter((meetup) => meetup.recommendationScore > 0)
+      .sort((a, b) => b.recommendationScore - a.recommendationScore)
+      .slice(0, 4);
+  }, [meetups, isMeetupExpired, isCurrentUserInMeetup, getInterestScore]);
+
+  const recommendedIds = useMemo(() => {
+    return new Set(recommendedForYou.map((meetup) => meetup._id));
+  }, [recommendedForYou]);
+
+  const allMeetups = useMemo(() => {
+    const now = new Date();
+
+    const scoreMeetup = (meetup) => {
+      let points = 0;
+
+      const meetupDateTime = getMeetupDateTime(meetup);
+
+      if (meetupDateTime && !isNaN(meetupDateTime.getTime())) {
+        const diffDays =
+          Math.abs(meetupDateTime.getTime() - now.getTime()) /
+          (1000 * 60 * 60 * 24);
+
+        points += Math.max(0, 30 - diffDays);
+      }
+
+      if (meetup.invitedPeople?.includes(loggedInUser?.name)) {
+        points += 40;
+      }
+
+      const attendeesCount = meetup.attendees?.length || 0;
+      const maxParticipants = meetup.maxParticipants || 10;
+
+      points += attendeesCount < maxParticipants ? 20 : -50;
+
+      if (!isCurrentUserInMeetup(meetup)) {
+        points += 10;
+      }
+
+      if (isCurrentUserCreator(meetup)) {
+        points += 5;
+      }
+
+      return points;
+    };
+
+    return [...meetups]
+      .filter((meetup) => !isMeetupExpired(meetup))
+      .sort((a, b) => scoreMeetup(b) - scoreMeetup(a));
+  }, [
+    meetups,
+    loggedInUser?.name,
+    getMeetupDateTime,
+    isCurrentUserInMeetup,
+    isCurrentUserCreator,
+    isMeetupExpired,
+  ]);
+
+  const filteredAllMeetups = useMemo(() => {
+    const query = searchTerm.toLowerCase();
+
+    return allMeetups.filter((m) => {
+      const matchesTitle = (m.title || "").toLowerCase().includes(query);
+      const matchesLocation = (m.location || "").toLowerCase().includes(query);
+
+      return matchesTitle || matchesLocation;
+    });
+  }, [allMeetups, searchTerm]);
 
   const handleCreateMeetup = async () => {
     if (
@@ -120,6 +293,12 @@ export default function MeetupPage() {
       !formData.time
     ) {
       return alert("Please fill required fields (Title, Place, Date, Time)");
+    }
+
+    const selectedDateTime = new Date(`${formData.date}T${formData.time}`);
+
+    if (selectedDateTime < new Date()) {
+      return alert("You cannot create a meetup in the past");
     }
 
     const newMeetupData = {
@@ -132,7 +311,7 @@ export default function MeetupPage() {
       maxParticipants: Number(formData.maxParticipants) || 10,
       createdBy: loggedInUser?.name || "Guest",
       attendees: [loggedInUser?.name || "Host"],
-      img: `https://picsum.photos/400/250?random=${Math.random()}`
+      img: `https://picsum.photos/400/250?random=${Math.random()}`,
     };
 
     try {
@@ -140,9 +319,9 @@ export default function MeetupPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(newMeetupData)
+        body: JSON.stringify(newMeetupData),
       });
 
       const data = await res.json();
@@ -171,7 +350,7 @@ export default function MeetupPage() {
         ...prev,
         invitePeople: isInvited
           ? prev.invitePeople.filter((name) => name !== userName)
-          : [...prev.invitePeople, userName]
+          : [...prev.invitePeople, userName],
       };
     });
   };
@@ -183,8 +362,8 @@ export default function MeetupPage() {
       const res = await fetch(`http://localhost:5000/api/meetups/${id}`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (res.ok) {
@@ -209,6 +388,12 @@ export default function MeetupPage() {
       return alert("Please login first");
     }
 
+    if (isMeetupExpired(selectedMeetup)) {
+      setSelectedMeetup(null);
+      fetchMeetups();
+      return alert("This meetup has already ended");
+    }
+
     const currentAttendeesCount = selectedMeetup?.attendees
       ? selectedMeetup.attendees.length
       : 0;
@@ -224,11 +409,11 @@ export default function MeetupPage() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          userName: loggedInUser.name
-        })
+          userName: loggedInUser.name,
+        }),
       });
 
       const data = await res.json();
@@ -252,8 +437,64 @@ export default function MeetupPage() {
     return new Date(d).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
-      year: "numeric"
+      year: "numeric",
     });
+  };
+
+  const renderMeetupCard = (item, isRecommended = false) => {
+    const totalParticipants = item.attendees ? item.attendees.length : 0;
+    const maxLimit = item.maxParticipants || 10;
+
+    return (
+      <div
+        key={item._id}
+        className="meetup-card-custom"
+        onClick={() => {
+          setSelectedMeetup(item);
+          setShowParticipants(false);
+        }}
+      >
+        <img src={item.img} alt="meetup" className="card-img" />
+
+        <div className="card-content">
+          <h3>{item.title}</h3>
+
+          <p className="card-date">
+            {formatDate(item.date)} • {item.time}
+          </p>
+
+          <div className="card-attendees">
+            <span>
+              👥 {totalParticipants} / {maxLimit} participants
+            </span>
+
+            {totalParticipants >= maxLimit && (
+              <span
+                style={{
+                  color: "#ff4d4d",
+                  fontSize: "12px",
+                  marginLeft: "8px",
+                }}
+              >
+                Full 🚫
+              </span>
+            )}
+          </div>
+
+          {isRecommended && (
+            <p
+              style={{
+                color: "#ffb703",
+                fontSize: "13px",
+                marginTop: "8px",
+              }}
+            >
+              Based on your interests ✨
+            </p>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -276,59 +517,29 @@ export default function MeetupPage() {
         </div>
       </div>
 
-      <div className="meetup-grid-layout">
-        {(meetups || [])
-          .filter((m) => {
-            const query = searchTerm.toLowerCase();
-            const matchesTitle = (m.title || "").toLowerCase().includes(query);
-            const matchesLocation = (m.location || "").toLowerCase().includes(query);
-            // 💡 يتم هنا فحص التطابق مع العنوان أو المكان معاً
-            return matchesTitle || matchesLocation;
-          })
-          .map((item) => {
-            const totalParticipants = item.attendees ? item.attendees.length : 0;
-            const maxLimit = item.maxParticipants || 10;
+      {recommendedForYou.length > 0 && (
+        <section className="recommendation-section">
+          <h2 className="meetup-section-title">RECOMMENDED FOR YOU</h2>
 
-            return (
-              <div
-                key={item._id}
-                className="meetup-card-custom"
-                onClick={() => {
-                  setSelectedMeetup(item);
-                  setShowParticipants(false);
-                }}
-              >
-                <img src={item.img} alt="meetup" className="card-img" />
+          <div className="meetup-grid-layout recommendation-grid">
+            {recommendedForYou.map((item) => renderMeetupCard(item, true))}
+          </div>
+        </section>
+      )}
 
-                <div className="card-content">
-                  <h3>{item.title}</h3>
+      <section className="all-meetups-section">
+        <h2 className="meetup-section-title">ALL MEETUPS</h2>
 
-                  <p className="card-date">
-                    {formatDate(item.date)} • {item.time}
-                  </p>
-
-                  <div className="card-attendees">
-                    <span>
-                      👥 {totalParticipants} / {maxLimit} participants
-                    </span>
-
-                    {totalParticipants >= maxLimit && (
-                      <span
-                        style={{
-                          color: "#ff4d4d",
-                          fontSize: "12px",
-                          marginLeft: "8px"
-                        }}
-                      >
-                        Full 🚫
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-      </div>
+        <div className="meetup-grid-layout all-meetups-grid">
+          {filteredAllMeetups.length > 0 ? (
+            filteredAllMeetups.map((item) =>
+              renderMeetupCard(item, recommendedIds.has(item._id))
+            )
+          ) : (
+            <p className="empty-meetup-text">No meetups found.</p>
+          )}
+        </div>
+      </section>
 
       {selectedMeetup && (
         <div className="popup-overlay" onClick={() => setSelectedMeetup(null)}>
@@ -342,7 +553,7 @@ export default function MeetupPage() {
                 <p
                   style={{
                     color: "rgba(255,255,255,0.6)",
-                    marginBottom: "15px"
+                    marginBottom: "15px",
                   }}
                 >
                   {selectedMeetup.notes}
@@ -498,7 +709,7 @@ export default function MeetupPage() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      meetupName: e.target.value
+                      meetupName: e.target.value,
                     })
                   }
                 />
@@ -513,7 +724,7 @@ export default function MeetupPage() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      placeName: e.target.value
+                      placeName: e.target.value,
                     })
                   }
                 />
@@ -529,7 +740,7 @@ export default function MeetupPage() {
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        date: e.target.value
+                        date: e.target.value,
                       })
                     }
                   />
@@ -544,7 +755,7 @@ export default function MeetupPage() {
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        time: e.target.value
+                        time: e.target.value,
                       })
                     }
                   />
@@ -562,7 +773,22 @@ export default function MeetupPage() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      maxParticipants: e.target.value
+                      maxParticipants: e.target.value,
+                    })
+                  }
+                />
+              </div>
+
+              <div className="input-group">
+                <label>Notes</label>
+
+                <textarea
+                  placeholder="Add meetup notes..."
+                  value={formData.notes}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      notes: e.target.value,
                     })
                   }
                 />
@@ -650,7 +876,7 @@ export default function MeetupPage() {
                 style={{
                   marginTop: "25px",
                   paddingTop: "15px",
-                  borderTop: "1px solid rgba(255,255,255,0.05)"
+                  borderTop: "1px solid rgba(255,255,255,0.05)",
                 }}
               >
                 <button
