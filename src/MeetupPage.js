@@ -603,8 +603,12 @@ export default function MeetupPage() {
                     <div className="participants-dropdown">
                       {(selectedMeetup.attendees || []).map((p, i) => {
                         const name = getPersonName(p);
+                        const matchedUser = allUsers.find((u) => u.name === name);
+
                         const id =
-                          typeof p === "string" ? null : p.id || p._id;
+                          typeof p === "string"
+                            ? matchedUser?._id || matchedUser?.id
+                            : p.id || p._id;
 
                         return (
                           <div
