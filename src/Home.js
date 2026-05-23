@@ -260,7 +260,7 @@ const getRecommendationScore = (place) => {
     const viewedCategory = cleanText(viewed.category);
 
     if (viewedCategory === placeCategory) {
-      score += 3;
+      score += 2;
     }
 
     if (
@@ -336,17 +336,9 @@ const recommendedPlaces = placesData
   }))
   .filter((place) =>
     userInterests.length > 0 || viewedPlaces.length > 0
-      ? place.recommendationScore >=3
+      ? place.recommendationScore >=4
       : (place.rating || 0) >= 4.5
   )
-  .filter(
-    (place) =>
-      !viewedPlaces.some(
-        (viewed) =>
-          (viewed._id || viewed.id) ===
-          (place._id || place.id)
-      )
-  ) 
   .sort((a, b) => {
     if (b.recommendationScore !== a.recommendationScore) {
       return b.recommendationScore - a.recommendationScore;
