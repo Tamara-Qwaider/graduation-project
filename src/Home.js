@@ -339,14 +339,7 @@ const recommendedPlaces = placesData
       ? place.recommendationScore >=3
       : (place.rating || 0) >= 4.5
   )
-  .filter(
-    (place) =>
-      !viewedPlaces.some(
-        (viewed) =>
-          (viewed._id || viewed.id) ===
-          (place._id || place.id)
-      )
-  ) 
+  
   .sort((a, b) => {
     if (b.recommendationScore !== a.recommendationScore) {
       return b.recommendationScore - a.recommendationScore;

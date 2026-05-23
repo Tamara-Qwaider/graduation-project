@@ -35,6 +35,7 @@ export default function MeetupPage() {
   const [formData, setFormData] = useState(emptyForm);
   const [meetups, setMeetups] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [places, setPlaces] = useState([]);
 
   const participantsRef = useRef(null);
 
@@ -180,10 +181,26 @@ export default function MeetupPage() {
     }
   }, [loggedInUser?.name, token]);
 
+  const fetchPlaces = useCallback(async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/places", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setPlaces(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Error fetching places:", err);
+      setPlaces([]);
+    }
+  }, [token]);
+
   useEffect(() => {
     fetchMeetups();
     fetchUsers();
-  }, [fetchMeetups, fetchUsers]);
+    fetchPlaces();
+  }, [fetchMeetups, fetchUsers, fetchPlaces]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -285,6 +302,27 @@ export default function MeetupPage() {
     });
   }, [allMeetups, searchTerm]);
 
+  const findPlaceImage = useCallback(() => {
+    const typedPlaceName = formData.placeName.toLowerCase().trim();
+
+    const matchedPlace = places.find((place) => {
+      const dbPlaceName = (place.name || place.title || "")
+        .toLowerCase()
+        .trim();
+
+      return dbPlaceName === typedPlaceName;
+    });
+
+    return (
+      matchedPlace?.img ||
+      matchedPlace?.image ||
+      matchedPlace?.photo ||
+      matchedPlace?.imageUrl ||
+      matchedPlace?.mainImage ||
+      "https://picsum.photos/400/250"
+    );
+  }, [formData.placeName, places]);
+
   const handleCreateMeetup = async () => {
     if (
       !formData.meetupName ||
@@ -301,6 +339,8 @@ export default function MeetupPage() {
       return alert("You cannot create a meetup in the past");
     }
 
+    const meetupImage = findPlaceImage();
+
     const newMeetupData = {
       title: formData.meetupName,
       location: formData.placeName,
@@ -311,7 +351,7 @@ export default function MeetupPage() {
       maxParticipants: Number(formData.maxParticipants) || 10,
       createdBy: loggedInUser?.name || "Guest",
       attendees: [loggedInUser?.name || "Host"],
-      img: `https://picsum.photos/400/250?random=${Math.random()}`,
+      img: meetupImage,
     };
 
     try {
