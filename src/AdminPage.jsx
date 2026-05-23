@@ -57,7 +57,7 @@ const jsonAuthHeaders = useMemo(() => {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [token]);
 
   // Fetch Categories
   useEffect(() => {
@@ -77,7 +77,7 @@ const jsonAuthHeaders = useMemo(() => {
       }
     };
     fetchCategories();
-  }, [authHeaders]);
+  }, [authHeaders,token]);
 
   // Fetch Places
   useEffect(() => {

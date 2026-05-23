@@ -3,6 +3,7 @@ import Navbar from "./Navbar";
 import axios from "axios";
 import "./ActivityPage.css";
 import toast, { Toaster } from "react-hot-toast";
+import { io } from "socket.io-client";
 
 /* ==========================================================================
    1. Sub-Components
@@ -128,6 +129,7 @@ const ActivityCard = ({
   icon,
   onDetailsClick,
   onLeave,
+  onChatClick,
 }) => (
   <div className="activity-card">
     <div className="activity-card-left-icon">{icon || "⛺"}</div>
@@ -166,6 +168,22 @@ const ActivityCard = ({
         >
           Activity Details
         </button>
+        <button
+          className="details-btn"
+          onClick={() =>
+            onChatClick({
+              _id,
+              title,
+              location,
+              date,
+              time,
+              createdBy,
+              attendees,
+            })
+          }
+        >
+         Chat 💬
+       </button>
 
         <button className="leave-btn" onClick={() => onLeave(_id)}>
           Leave Activity
@@ -222,6 +240,7 @@ const StatCircle = ({ title, items }) => (
     </div>
   </div>
 );
+const socket = io("http://localhost:5000");
 
 /* ==========================================================================
    2. Main Page Component
@@ -234,7 +253,10 @@ export default function ActivityPage() {
   const [invites, setInvites] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [dashboardFocus, setDashboardFocus] = useState(null);
-
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMeetup, setChatMeetup] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
   const dashboardRef = useRef(null);
 
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
@@ -328,7 +350,7 @@ export default function ActivityPage() {
       setInvites([]);
       toast.error("Failed to load real activities.");
     }
-  }, [loggedInUser?.name, dashboardFocus, isMeetupActive]);
+  }, [loggedInUser?.name, dashboardFocus, isMeetupActive, token]);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -353,6 +375,17 @@ export default function ActivityPage() {
     fetchRealData();
     fetchNotifications();
   }, [fetchRealData, fetchNotifications]);
+  useEffect(() => {
+  socket.on("receive_meetup_message", (messageData) => {
+    if (messageData.meetupId === chatMeetup?._id) {
+      setMessages((prev) => [...prev, messageData]);
+    }
+  });
+
+  return () => {
+    socket.off("receive_meetup_message");
+  };
+}, [chatMeetup]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -415,7 +448,7 @@ export default function ActivityPage() {
         fetchRealData();
       }
     } catch (err) {
-      console.error("Error joining activity:", err);
+      console.error("JOIN ERROR:", err.response?.data || err);
       toast.error(err.response?.data?.message || "Error joining activity.");
       fetchRealData();
     }
@@ -493,6 +526,14 @@ export default function ActivityPage() {
   };
 
   const unreadNotifications = notifications.filter((n) => !n.isRead);
+  const fetchMessages = async (meetupId) => {
+  try {
+    const res = await axios.get(`http://localhost:5000/api/messages/${meetupId}`);
+    setMessages(Array.isArray(res.data) ? res.data : []);
+  } catch (err) {
+    console.error("Error fetching messages:", err);
+  }
+};
 
   const statsData = [
     {
@@ -611,6 +652,12 @@ export default function ActivityPage() {
                   {...act}
                   onDetailsClick={handleDetailsClick}
                   onLeave={handleLeaveActivity}
+                  onChatClick={(activity) => {
+                    setChatMeetup(activity);
+                    setIsChatOpen(true);
+                    socket.emit("join_meetup_chat", activity._id);
+                    fetchMessages(activity._id);
+                  }}
                 />
               ))
             ) : (
@@ -630,6 +677,73 @@ export default function ActivityPage() {
             ))}
           </div>
         </section>
+        {isChatOpen && chatMeetup && (
+          <div className="activity-popup-overlay" onClick={() => setIsChatOpen(false)}>
+            <div className="activity-popup-box" onClick={(e) => e.stopPropagation()}>
+              <button className="activity-popup-close" onClick={() => setIsChatOpen(false)}>
+                ✕
+              </button>
+
+              <div className="activity-popup-header">
+                <div className="activity-popup-icon">💬</div>
+                <h2>{chatMeetup.title}</h2>
+                <p>MEETUP CHAT</p>
+              </div>
+
+              <div className="chat-messages-box">
+                {messages.length > 0 ? (
+                  messages.map((msg, index) => (
+                    <div
+                      key={index}
+                      className={`chat-message ${
+                        msg.senderName === loggedInUser?.name ? "mine" : ""
+                      }`}
+                    >
+                      <strong>{msg.senderName}</strong>
+                      <p>{msg.text}</p>
+                   </div>
+                  ))
+                ) : (
+                  <p className="empty-text">No messages yet. Start the chat ✨</p>
+                )}
+              </div>
+
+              <div className="chat-input-row">
+                <input
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Write a message..."
+                />
+
+                <button
+                  onClick={async() => {
+                    if (!newMessage.trim()) return;
+
+                    const messageData = {
+                      meetupId: chatMeetup._id,
+                      senderId: loggedInUser?._id || loggedInUser?.id,
+                      senderName: loggedInUser?.name,
+                      text: newMessage,
+                    };
+                    try {
+                      const response = await axios.post(
+                        "http://localhost:5000/api/messages",
+                        messageData
+                      );
+
+                      socket.emit("send_meetup_message", response.data);
+                      setNewMessage("");
+                    } catch (err) {
+                      toast.error("Failed to send message.");
+                    }
+                  }}
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

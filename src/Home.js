@@ -260,7 +260,7 @@ const getRecommendationScore = (place) => {
     const viewedCategory = cleanText(viewed.category);
 
     if (viewedCategory === placeCategory) {
-      score += 3;
+      score += 2;
     }
 
     if (
@@ -336,7 +336,7 @@ const recommendedPlaces = placesData
   }))
   .filter((place) =>
     userInterests.length > 0 || viewedPlaces.length > 0
-      ? place.recommendationScore >=3
+      ? place.recommendationScore >=4
       : (place.rating || 0) >= 4.5
   )
   
