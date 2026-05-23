@@ -4,6 +4,7 @@ import axios from "axios";
 import "./ActivityPage.css";
 import toast, { Toaster } from "react-hot-toast";
 import { io } from "socket.io-client";
+import EmojiPicker from "emoji-picker-react";
 
 /* ==========================================================================
    1. Sub-Components
@@ -127,11 +128,17 @@ const ActivityCard = ({
   location,
   attendees,
   icon,
+  unreadCount,
   onDetailsClick,
   onLeave,
   onChatClick,
 }) => (
   <div className="activity-card">
+    {unreadCount > 0 && (
+      <div className="chat-unread-badge">
+        {unreadCount}
+      </div>
+    )}
     <div className="activity-card-left-icon">{icon || "⛺"}</div>
 
     <div className="activity-card-content">
@@ -193,6 +200,7 @@ const ActivityCard = ({
   </div>
 );
 
+
 const NotificationCard = ({ notification, onRead, onDelete }) => (
   <div className="invite-card">
     <div className="invite-card-top">
@@ -240,7 +248,7 @@ const StatCircle = ({ title, items }) => (
     </div>
   </div>
 );
-const socket = io("http://localhost:5000");
+
 
 /* ==========================================================================
    2. Main Page Component
@@ -257,7 +265,16 @@ export default function ActivityPage() {
   const [chatMeetup, setChatMeetup] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [typingUser, setTypingUser] = useState("");
+  const [unreadCounts, setUnreadCounts] = useState(() => {
+    const saved = localStorage.getItem("unreadChatCounts");
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const dashboardRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const socketRef = useRef(null);
 
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
   const token = localStorage.getItem("token");
@@ -372,20 +389,94 @@ export default function ActivityPage() {
   }, [loggedInUser?.name]);
 
   useEffect(() => {
+  const handleClickOutside = (e) => {
+    if (
+      showEmojiPicker &&
+      !e.target.closest(".emoji-picker-wrapper") &&
+      !e.target.closest(".emoji-toggle-btn")
+    ) {
+      setShowEmojiPicker(false);
+    }
+  };
+
+  document.addEventListener("mousedown", handleClickOutside);
+
+  return () => {
+    document.removeEventListener(
+      "mousedown",
+      handleClickOutside
+    );
+  };
+}, [showEmojiPicker]);
+
+  useEffect(() => {
     fetchRealData();
     fetchNotifications();
   }, [fetchRealData, fetchNotifications]);
   useEffect(() => {
-  socket.on("receive_meetup_message", (messageData) => {
-    if (messageData.meetupId === chatMeetup?._id) {
-      setMessages((prev) => [...prev, messageData]);
-    }
+  localStorage.setItem("unreadChatCounts", JSON.stringify(unreadCounts));
+  window.dispatchEvent(new Event("unreadChatUpdated"));
+}, [unreadCounts]);
+
+  useEffect(() => {
+  socketRef.current = io("http://localhost:5000");
+
+  socketRef.current.on("receive_meetup_message", (messageData) => {
+  setMessages((prev) => {
+    const exists = prev.some((msg) => msg._id === messageData._id);
+
+    if (exists) return prev;
+
+    return [...prev, messageData];
   });
+  if (
+    messageData.meetupId !== chatMeetup?._id &&
+    messageData.senderName !== loggedInUser?.name
+  ) {
+  setUnreadCounts((prev) => ({
+    ...prev,
+    [messageData.meetupId]: (prev[messageData.meetupId] || 0) + 1,
+  }));
+}
+});
+socketRef.current.on("user_typing", (data) => {
+  if (
+    data.meetupId === chatMeetup?._id &&
+    data.userName !== loggedInUser?.name
+  ) {
+    setTypingUser(data.userName);
+  }
+});
+
+socketRef.current.on("user_stop_typing", (data) => {
+  if (data.meetupId === chatMeetup?._id) {
+    setTypingUser("");
+  }
+});
 
   return () => {
-    socket.off("receive_meetup_message");
+    socketRef.current.disconnect();
   };
-}, [chatMeetup]);
+}, [chatMeetup?._id, loggedInUser?.name]);
+
+
+useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [messages]);
+
+useEffect(() => {
+  if (!chatMeetup) return;
+
+  const meetupDate = getMeetupDateTime(chatMeetup);
+
+  if (!meetupDate) return;
+
+  if (meetupDate <= new Date()) {
+    setIsChatOpen(false);
+    setChatMeetup(null);
+    toast("This meetup has ended.");
+  }
+}, [chatMeetup, getMeetupDateTime]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -534,6 +625,37 @@ export default function ActivityPage() {
     console.error("Error fetching messages:", err);
   }
 };
+ const handleSendMessage = async () => {
+  if (!newMessage.trim() || isSending) return;
+
+  setIsSending(true);
+
+  const messageData = {
+    meetupId: chatMeetup._id,
+    senderId: loggedInUser?._id || loggedInUser?.id,
+    senderName: loggedInUser?.name,
+    text: newMessage.trim(),
+  };
+
+  try {
+    const response = await axios.post(
+      "http://localhost:5000/api/messages",
+      messageData
+    );
+
+    socketRef.current.emit("send_meetup_message", response.data);
+    setNewMessage("");
+    socketRef.current.emit("stop_typing", {
+      meetupId: chatMeetup._id,
+    });
+    setShowEmojiPicker(false);
+  } catch (err) {
+    toast.error("Failed to send message.");
+  } finally {
+    setIsSending(false);
+  }
+};
+
 
   const statsData = [
     {
@@ -584,6 +706,10 @@ export default function ActivityPage() {
       ],
     },
   ];
+  const totalUnreadMessages = Object.values(unreadCounts).reduce(
+  (sum, count) => sum + count,
+  0
+);
 
   return (
     <div className="activity-page-bg">
@@ -596,7 +722,7 @@ export default function ActivityPage() {
       />
 
       <div className="activity-navbar-wrap">
-        <Navbar />
+        <Navbar unreadMessages={totalUnreadMessages} />
       </div>
 
       <main className="activity-main">
@@ -650,12 +776,17 @@ export default function ActivityPage() {
                 <ActivityCard
                   key={act._id}
                   {...act}
+                  unreadCount={unreadCounts[act._id] || 0}
                   onDetailsClick={handleDetailsClick}
                   onLeave={handleLeaveActivity}
                   onChatClick={(activity) => {
                     setChatMeetup(activity);
                     setIsChatOpen(true);
-                    socket.emit("join_meetup_chat", activity._id);
+                    setUnreadCounts((prev) => ({
+                      ...prev,
+                      [activity._id]: 0,
+                    }));
+                    socketRef.current.emit("join_meetup_chat", activity._id);
                     fetchMessages(activity._id);
                   }}
                 />
@@ -699,46 +830,119 @@ export default function ActivityPage() {
                         msg.senderName === loggedInUser?.name ? "mine" : ""
                       }`}
                     >
-                      <strong>{msg.senderName}</strong>
+                      <strong
+                        className="chat-user-name"
+                        onClick={() => {
+                          if (msg.senderId) {
+                            window.location.href = `/profile/${msg.senderId}`;
+                          }
+                        }}
+                      >
+                        {msg.senderName}
+                      </strong>
                       <p>{msg.text}</p>
+
+                      <div className="chat-message-footer">
+                        <small className="chat-time">
+                          {msg.createdAt
+                            ? new Date(msg.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                             minute: "2-digit",
+                            })
+                          : ""}
+                        </small>
+
+                        {msg.senderId === (loggedInUser?._id || loggedInUser?.id) && (
+                          <button
+                            className="delete-message-btn"
+                            onClick={async () => {
+                              try {
+                                await axios.delete(
+                                 `http://localhost:5000/api/messages/${msg._id}`
+                                );
+
+                                setMessages((prev) =>
+                                  prev.filter((m) => m._id !== msg._id)
+                                );
+
+                                toast.success("Message deleted");
+                              } catch (err) {
+                                toast.error("Failed to delete message");
+                              }
+                            }}
+                         >
+                           🗑
+                          </button>
+                        )}
+                      </div>
+                        
                    </div>
                   ))
                 ) : (
                   <p className="empty-text">No messages yet. Start the chat ✨</p>
                 )}
+                <div ref={messagesEndRef} />
               </div>
 
+              {showEmojiPicker && (
+                <div className="emoji-picker-wrapper">
+                 <EmojiPicker
+                    height={350}
+                    width={280}
+                    onEmojiClick={(emojiData) => {
+                      setNewMessage((prev) => prev + emojiData.emoji);
+                    }}
+                    theme="dark"
+                  />
+                </div>
+              )}
+              {typingUser && (
+                <p className="typing-indicator">
+                  {typingUser} is typing...
+                </p>
+              )}
+
               <div className="chat-input-row">
+                <button
+                  type="button"
+                  className="emoji-toggle-btn"
+                  onClick={() => setShowEmojiPicker((prev) => !prev)}
+                >
+                  😊
+                </button>
                 <input
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                  onChange={(e) => {
+                    setNewMessage(e.target.value);
+
+                    socketRef.current.emit("typing", {
+                      meetupId: chatMeetup._id,
+                      userName: loggedInUser?.name,
+                    });
+
+                    clearTimeout(window.typingTimeout);
+
+                    window.typingTimeout = setTimeout(() => {
+                      socketRef.current.emit("stop_typing", {
+                        meetupId: chatMeetup._id,
+                      });
+                    }, 1200);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
                   placeholder="Write a message..."
+                  
                 />
 
                 <button
-                  onClick={async() => {
-                    if (!newMessage.trim()) return;
-
-                    const messageData = {
-                      meetupId: chatMeetup._id,
-                      senderId: loggedInUser?._id || loggedInUser?.id,
-                      senderName: loggedInUser?.name,
-                      text: newMessage,
-                    };
-                    try {
-                      const response = await axios.post(
-                        "http://localhost:5000/api/messages",
-                        messageData
-                      );
-
-                      socket.emit("send_meetup_message", response.data);
-                      setNewMessage("");
-                    } catch (err) {
-                      toast.error("Failed to send message.");
-                    }
-                  }}
+                  disabled={isSending}
+                  onClick={handleSendMessage}
                 >
-                  Send
+                  {isSending ? "Sending..." : "Send"}
                 </button>
               </div>
             </div>
