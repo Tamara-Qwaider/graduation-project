@@ -28,7 +28,7 @@ export default function MeetupPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [userSearchTerm, setUserSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [selectedMeetup, setSelectedMeetup] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

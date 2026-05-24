@@ -427,10 +427,7 @@ useEffect(() => {
   };
 }, [showEmojiPicker]);
 
-  useEffect(() => {
-    fetchRealData();
-    fetchNotifications();
-  }, [fetchRealData, fetchNotifications]);
+
   useEffect(() => {
   localStorage.setItem("unreadChatCounts", JSON.stringify(unreadCounts));
   window.dispatchEvent(new Event("unreadChatUpdated"));
@@ -438,6 +435,13 @@ useEffect(() => {
 
   useEffect(() => {
   socketRef.current = io("http://localhost:5000");
+
+  socketRef.current.on("new_notification", (notification) => {
+  if (notification.userName === loggedInUser?.name) {
+    setNotifications((prev) => [notification, ...prev]);
+    toast(notification.message);
+   }
+    });
 
   socketRef.current.on("receive_meetup_message", (messageData) => {
   setMessages((prev) => {
@@ -473,6 +477,7 @@ socketRef.current.on("user_stop_typing", (data) => {
 });
 
   return () => {
+    socketRef.current.off("new_notification");
     socketRef.current.disconnect();
   };
 }, [chatMeetup?._id, loggedInUser?.name]);
