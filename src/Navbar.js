@@ -1,9 +1,35 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+import axios from "axios";
 
 export default function Navbar({ unreadMessages = 0 }) {
   const location = useLocation();
   const [storedUnread, setStoredUnread] = useState(0);
+  const fetchUnreadFromBackend = async () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user"));
+    const userId = user?._id || user?.id;
+
+    if (!userId) return;
+
+    const res = await axios.get(
+      `http://localhost:5000/api/messages/unread/${userId}`
+    );
+
+    const counts = res.data || {};
+
+    localStorage.setItem("unreadChatCounts", JSON.stringify(counts));
+
+    const total = Object.values(counts).reduce(
+      (sum, count) => sum + count,
+      0
+    );
+
+    setStoredUnread(total);
+  } catch (err) {
+    console.error("Navbar unread error:", err);
+  }
+};
 
 useEffect(() => {
   const updateUnread = () => {
@@ -19,6 +45,7 @@ useEffect(() => {
   };
 
   updateUnread();
+  fetchUnreadFromBackend();
 
   window.addEventListener("storage", updateUnread);
   window.addEventListener("unreadChatUpdated", updateUnread);
@@ -28,7 +55,7 @@ useEffect(() => {
     window.removeEventListener("unreadChatUpdated", updateUnread);
   };
 }, []);
-const badgeCount = unreadMessages || storedUnread;
+const badgeCount = storedUnread;
 
   return (
     <div className="flex justify-center gap-10 mb-12 mt-2">

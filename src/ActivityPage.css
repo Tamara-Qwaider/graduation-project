@@ -701,7 +701,7 @@
 
 .chat-unread-badge {
   position: absolute;
-  top: -8px;
+  top: 6px;
   right: -8px;
   background: #ff2d55;
   color: white;

@@ -270,6 +270,17 @@ const getRecommendationScore = (place) => {
       score += 1;
     }
   });
+  savedPlaces.forEach((saved) => {
+  const savedCategory = cleanText(saved.category);
+
+  if (savedCategory === placeCategory) {
+    score += 3;
+  }
+
+  if (cleanText(saved.location) === cleanText(place.location)) {
+    score += 1;
+  }
+});
 
   userInterests.forEach((interest) => {
     const cleanInterest = cleanText(interest);
@@ -316,6 +327,14 @@ const getRecommendationReason = (place) => {
       placeDescription.includes(cleanInterest)
     );
   });
+
+  const matchedSavedPlace = savedPlaces.find(
+  (saved) => cleanText(saved.category) === placeCategory
+);
+
+if (matchedSavedPlace) {
+  return `Because you saved ${matchedSavedPlace.name}`;
+}
 
   if (matchedInterest) {
     return `Because you like ${matchedInterest}`;

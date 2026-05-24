@@ -277,6 +277,8 @@ export default function ActivityPage() {
   const socketRef = useRef(null);
 
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
+  const userId = loggedInUser?._id || loggedInUser?.id;
+  const userName = loggedInUser?.name;
   const token = localStorage.getItem("token");
 
   const getMeetupDateTime = useCallback((meetup) => {
@@ -324,8 +326,6 @@ export default function ActivityPage() {
       const allMeetups = Array.isArray(response.data) ? response.data : [];
       const activeMeetups = allMeetups.filter(isMeetupActive);
 
-      const userName = loggedInUser?.name;
-
       if (!userName) {
         setCurrentActivities([]);
         setInvites([]);
@@ -367,7 +367,7 @@ export default function ActivityPage() {
       setInvites([]);
       toast.error("Failed to load real activities.");
     }
-  }, [loggedInUser?.name, dashboardFocus, isMeetupActive, token]);
+  }, [userName, dashboardFocus, isMeetupActive, token]);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -387,6 +387,20 @@ export default function ActivityPage() {
       console.error("Error fetching notifications:", err);
     }
   }, [loggedInUser?.name]);
+
+  const fetchUnreadCounts = useCallback(async () => {
+  try {
+    if (!userId) return;
+
+    const res = await axios.get(
+      `http://localhost:5000/api/messages/unread/${userId}`
+    );
+
+    setUnreadCounts(res.data || {});
+  } catch (err) {
+    console.error("Error fetching unread counts:", err);
+  }
+}, [userId]);
 
   useEffect(() => {
   const handleClickOutside = (e) => {
@@ -412,7 +426,8 @@ export default function ActivityPage() {
   useEffect(() => {
     fetchRealData();
     fetchNotifications();
-  }, [fetchRealData, fetchNotifications]);
+    fetchUnreadCounts();
+  }, [fetchRealData, fetchNotifications, fetchUnreadCounts]);
   useEffect(() => {
   localStorage.setItem("unreadChatCounts", JSON.stringify(unreadCounts));
   window.dispatchEvent(new Event("unreadChatUpdated"));
@@ -427,17 +442,16 @@ export default function ActivityPage() {
 
     if (exists) return prev;
 
+    if (messageData.senderId === userId) return prev;
+
     return [...prev, messageData];
   });
   if (
     messageData.meetupId !== chatMeetup?._id &&
     messageData.senderName !== loggedInUser?.name
   ) {
-  setUnreadCounts((prev) => ({
-    ...prev,
-    [messageData.meetupId]: (prev[messageData.meetupId] || 0) + 1,
-  }));
-}
+    fetchUnreadCounts();
+  }
 });
 socketRef.current.on("user_typing", (data) => {
   if (
@@ -457,7 +471,7 @@ socketRef.current.on("user_stop_typing", (data) => {
   return () => {
     socketRef.current.disconnect();
   };
-}, [chatMeetup?._id, loggedInUser?.name]);
+}, [chatMeetup?._id, loggedInUser?.name, fetchUnreadCounts, userId]);
 
 
 useEffect(() => {
@@ -625,6 +639,28 @@ useEffect(() => {
     console.error("Error fetching messages:", err);
   }
 };
+
+const markMessagesAsRead = async (meetupId) => {
+  try {
+    const userId = loggedInUser?._id || loggedInUser?.id;
+
+    if (!userId) return;
+
+    await axios.put(
+      `http://localhost:5000/api/messages/read/${meetupId}`,
+      { userId }
+    );
+
+    setUnreadCounts((prev) => ({
+      ...prev,
+      [meetupId]: 0,
+    }));
+
+    fetchUnreadCounts();
+  } catch (err) {
+    console.error("Error marking messages as read:", err);
+  }
+};
  const handleSendMessage = async () => {
   if (!newMessage.trim() || isSending) return;
 
@@ -642,6 +678,7 @@ useEffect(() => {
       "http://localhost:5000/api/messages",
       messageData
     );
+    setMessages((prev) => [...prev, response.data]);
 
     socketRef.current.emit("send_meetup_message", response.data);
     setNewMessage("");
@@ -788,6 +825,7 @@ useEffect(() => {
                     }));
                     socketRef.current.emit("join_meetup_chat", activity._id);
                     fetchMessages(activity._id);
+                    markMessagesAsRead(activity._id);
                   }}
                 />
               ))
