@@ -245,9 +245,24 @@ const loggedUser = JSON.parse(localStorage.getItem("user"));
 const userInterests = loggedUser?.interests || [];
 
 const cleanText = (text = "") =>
-  text.toLowerCase().replace(/[^\w\s]/g, "").trim();
+  String(text || "")
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 
+const interestCategoryMap = {
+  music: "activities event",
+  travel: "activities event",
+  sports: "activities event",
+  nature: "activities event",
+
+  restaurants: "restaurants",
+  cafes: "cafes",
+  shopping: "shopping",
+  movies: "movies",
+};
 
 const getRecommendationScore = (place) => {
   let score = 0;
@@ -274,12 +289,15 @@ const getRecommendationScore = (place) => {
   userInterests.forEach((interest) => {
     const cleanInterest = cleanText(interest);
 
-    if (
-      placeCategory.includes(cleanInterest) ||
-      cleanInterest.includes(placeCategory)
-    ) {
-      score += 4;
-    }
+    const mappedInterestCategory =
+  interestCategoryMap[cleanInterest] || cleanInterest;
+
+if (
+  placeCategory.includes(mappedInterestCategory) ||
+  mappedInterestCategory.includes(placeCategory)
+) {
+  score += 4;
+}
 
     if (placeName.includes(cleanInterest)) {
       score += 2;
@@ -309,9 +327,12 @@ const getRecommendationReason = (place) => {
   const matchedInterest = userInterests.find((interest) => {
     const cleanInterest = cleanText(interest);
 
+    const mappedInterestCategory =
+      interestCategoryMap[cleanInterest] || cleanInterest;
+
     return (
-      placeCategory.includes(cleanInterest) ||
-      cleanInterest.includes(placeCategory) ||
+      placeCategory.includes(mappedInterestCategory) ||
+      mappedInterestCategory.includes(placeCategory) ||
       placeName.includes(cleanInterest) ||
       placeDescription.includes(cleanInterest)
     );

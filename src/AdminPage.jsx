@@ -154,83 +154,135 @@ const jsonAuthHeaders = useMemo(() => {
     setSearchTerm("");
   };
 
-  const handleCreateMeetup = async (newMeetup) => {
-    const loggedInUser = JSON.parse(localStorage.getItem("user"));
-    const meetupData = {
-      title: newMeetup.title,
-      location: newMeetup.loc,
-      date: newMeetup.date || new Date().toISOString().split("T")[0],
-      time: newMeetup.time || "12:00",
-      maxParticipants: Number(newMeetup.p) || 10,
-      createdBy: loggedInUser?.name || "Admin",
-      attendees: [loggedInUser?.name || "Admin"],
-      notes: newMeetup.notes || "Created by Admin",
-      img: `https://picsum.photos/400/250?random=${Math.random()}`,
-    };
-    try {
-      const res = await fetch("http://localhost:5000/api/meetups/create", {
-        method: "POST",
-        headers: jsonAuthHeaders,
-        body: JSON.stringify(meetupData),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.message || "Failed to create meetup");
-        return;
-      }
-      refreshMeetups();
-      setIsCreateMeetupOpen(false);
-      alert("Meetup created successfully and published! 🚀");
-    } catch (err) {
-      alert("Server error while creating meetup");
-    }
+ const handleCreateMeetup = async (newMeetup) => {
+  const loggedInUser = JSON.parse(localStorage.getItem("user"));
+
+  const selectedPlace = places.find(
+    (p) =>
+      (p.name || "").toLowerCase().trim() ===
+      (newMeetup.loc || "").toLowerCase().trim()
+  );
+
+  if (!selectedPlace) {
+    alert("Please choose a place from the database.");
+    return;
+  }
+
+  const placeImage =
+    selectedPlace.image ||
+    selectedPlace.img ||
+    selectedPlace.images?.[0] ||
+    "https://picsum.photos/400/250";
+
+  const meetupData = {
+    title: newMeetup.title,
+    location: selectedPlace.name,
+    date: newMeetup.date || new Date().toISOString().split("T")[0],
+    time: newMeetup.time || "12:00",
+    maxParticipants: Number(newMeetup.p) || 10,
+    createdBy: loggedInUser?.name || "Admin",
+    attendees: [loggedInUser?.name || "Admin"],
+    notes: newMeetup.notes || "Created by Admin",
+    img: placeImage,
+    category: selectedPlace.category || "",
   };
+
+  try {
+    const res = await fetch("http://localhost:5000/api/meetups/create", {
+      method: "POST",
+      headers: jsonAuthHeaders,
+      body: JSON.stringify(meetupData),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.message || "Failed to create meetup");
+      return;
+    }
+
+    refreshMeetups();
+    setIsCreateMeetupOpen(false);
+    alert("Meetup created successfully and published! 🚀");
+  } catch (err) {
+    alert("Server error while creating meetup");
+  }
+};
 
   const handleUpdateMeetup = async (updatedMeetup) => {
-    try {
-      const id = updatedMeetup._id || updatedMeetup.id;
-      const res = await fetch(`http://localhost:5000/api/meetups/${id}`, {
-        method: "PUT",
-        headers: jsonAuthHeaders,
-        body: JSON.stringify({
-          title: updatedMeetup.title,
-          location: updatedMeetup.loc || updatedMeetup.location,
-          date: updatedMeetup.date,
-          time: updatedMeetup.time,
-          attendees: updatedMeetup.attendees,
-          maxParticipants: Number(updatedMeetup.maxParticipants),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        alert(data.message || "Failed to update meetup");
-        return;
-      }
-      refreshMeetups();
-      setIsEditMeetupOpen(false);
-      alert("Meetup updated successfully! ✏️");
-    } catch (err) {
-      alert("Server error while updating meetup");
-    }
-  };
+  try {
+    const id = updatedMeetup._id || updatedMeetup.id;
 
-  const handleDeleteMeetup = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this meetup?")) return;
-    try {
-      const res = await fetch(`http://localhost:5000/api/meetups/${id}`, {
-        method: "DELETE",
-        headers: authHeaders,
-      });
-      if (res.ok) {
-        refreshMeetups();
-        alert("Meetup deleted! 🗑️");
-      } else {
-        alert("Failed to delete meetup");
-      }
-    } catch (err) {
-      alert("Error deleting meetup");
+    if (!id) {
+      alert("Meetup ID not found");
+      return;
     }
-  };
+
+    const res = await fetch(`http://localhost:5000/api/meetups/${id}`, {
+      method: "PUT",
+      headers: jsonAuthHeaders,
+      body: JSON.stringify({
+        title: updatedMeetup.title,
+        location: updatedMeetup.location || updatedMeetup.loc,
+        date: updatedMeetup.date,
+        time: updatedMeetup.time,
+        notes: updatedMeetup.notes,
+        img: updatedMeetup.img,
+        attendees: updatedMeetup.attendees || [],
+        invitedPeople: updatedMeetup.invitedPeople || [],
+        maxParticipants: Number(updatedMeetup.maxParticipants || updatedMeetup.p || 10),
+        category: updatedMeetup.category || "",
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.message || "Failed to update meetup");
+      return;
+    }
+
+    setMeetups((prev) =>
+      prev.map((m) => (m._id === id || m.id === id ? data : m))
+    );
+
+    setSelectedItem(null);
+    setIsEditMeetupOpen(false);
+    alert("Meetup updated successfully! ✏️");
+  } catch (err) {
+    console.error(err);
+    alert("Server error while updating meetup");
+  }
+};
+
+const handleDeleteMeetup = async (id) => {
+  if (!id) {
+    alert("Meetup ID not found");
+    return;
+  }
+
+  if (!window.confirm("Are you sure you want to delete this meetup?")) return;
+
+  try {
+    const res = await fetch(`http://localhost:5000/api/meetups/${id}`, {
+      method: "DELETE",
+      headers: authHeaders,
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.message || "Failed to delete meetup");
+      return;
+    }
+
+    setMeetups((prev) => prev.filter((m) => m._id !== id && m.id !== id));
+    alert(data.message || "Meetup deleted! 🗑️");
+  } catch (err) {
+    console.error(err);
+    alert("Error deleting meetup");
+  }
+};
  const uploadToCloudinary = async (file) => {
   const data = new FormData();
 
@@ -526,7 +578,7 @@ const allImages = [mainImageUrl, ...extraImageUrls].filter(Boolean);
       {/* 🎯 تم تعديل السطر التالي ليتطابق مع الـ State الصحيحة */}
       <EditMeetupModal isOpen={isEditMeetupOpen} onClose={() => setIsEditMeetupOpen(false)} meetup={selectedItem} onSave={handleUpdateMeetup} onCreateNew={() => { setIsEditMeetupOpen(false); setIsCreateMeetupOpen(true); }} />
       
-      <CreateMeetupModal isOpen={isCreateMeetupOpen} onClose={() => setIsCreateMeetupOpen(false)} onCreate={handleCreateMeetup} />
+      <CreateMeetupModal isOpen={isCreateMeetupOpen} onClose={() => setIsCreateMeetupOpen(false)} onCreate={handleCreateMeetup} places={places} />
       <RestrictUserModal
         isOpen={isRestrictUserOpen}
         onClose={() => setIsRestrictUserOpen(false)}
@@ -638,7 +690,7 @@ const MeetupSection = ({ data, onEdit, onBlock, onCreateClick }) => (
         const totalAttendees = m.attendees ? m.attendees.length : 0;
         const maxLimit = m.maxParticipants || m.p || 10;
         return (
-          <motion.div layout key={m._id || m.id} className="bg-[#6d28d9] p-10 rounded-[2.5rem] shadow-xl">
+          <motion.div layout key={m._id} className="bg-[#6d28d9] p-10 rounded-[2.5rem] shadow-xl">
             <h3 className="text-2xl font-bold mb-6">{m.title}</h3>
             <div className="space-y-3 text-purple-100 mb-10">
               <p>📍 {m.location || m.loc}</p>
@@ -647,7 +699,7 @@ const MeetupSection = ({ data, onEdit, onBlock, onCreateClick }) => (
             </div>
             <div className="flex gap-4">
               <button onClick={() => onEdit(m)} className="flex-1 bg-[#ff6b35] py-4 rounded-2xl font-bold uppercase text-xs">✏️ Edit</button>
-              <button onClick={() => onBlock(m._id || m.id)} className="flex-1 bg-red-600 hover:bg-red-700 py-4 rounded-2xl font-bold uppercase text-xs transition-colors">🚫 Delete</button>
+              <button onClick={() => onBlock(m._id)} className="flex-1 bg-red-600 hover:bg-red-700 py-4 rounded-2xl font-bold uppercase text-xs transition-colors">🚫 Delete</button>
             </div>
           </motion.div>
         );
@@ -884,7 +936,7 @@ const AddPlaceModal = ({ isOpen, onClose, onAdd, categories }) => {
   );
 };
 
-const CreateMeetupModal = ({ isOpen, onClose, onCreate }) => {
+const CreateMeetupModal = ({ isOpen, onClose, onCreate, places}) => {
   const [formData, setFormData] = useState({ title: "", loc: "", date: "", time: "", p: "", notes: "" });
   return (
     <AnimatePresence>
@@ -895,8 +947,14 @@ const CreateMeetupModal = ({ isOpen, onClose, onCreate }) => {
             <div className="px-12 pt-12 pb-6"><h2 className="text-3xl font-black uppercase text-[#ff6b35] mb-2">Create Meetup</h2></div>
             <div className="px-12 pb-10 space-y-4">
               <input type="text" onChange={(e) => setFormData({ ...formData, title: e.target.value })} placeholder="Meetup Name" className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none text-white focus:ring-2 focus:ring-[#ff6b35]" />
-              <input type="text" onChange={(e) => setFormData({ ...formData, loc: e.target.value })} placeholder="Place Name / Location" className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none text-white focus:ring-2 focus:ring-[#ff6b35]" />
-              <div className="grid grid-cols-2 gap-4">
+              <input  type="text" list="admin-places-list" value={formData.loc} onChange={(e) => setFormData({ ...formData, loc: e.target.value })}  placeholder="Choose Place From Database" className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none text-white focus:ring-2 focus:ring-[#ff6b35]"/>    
+
+               <datalist id="admin-places-list">
+                 {places.map((place) => (
+                  <option key={place._id} value={place.name} />
+                ))}
+               </datalist>
+               <div className="grid grid-cols-2 gap-4">
                 <input type="date" onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none text-white focus:ring-2 focus:ring-[#ff6b35]" />
                 <input type="time" onChange={(e) => setFormData({ ...formData, time: e.target.value })} className="w-full bg-[#060b1a] p-5 rounded-2xl border-none outline-none text-white focus:ring-2 focus:ring-[#ff6b35]" />
               </div>
@@ -924,7 +982,13 @@ const EditMeetupModal = ({ isOpen, onClose, meetup, onCreateNew, onSave }) => {
     }
   }, [meetup, isOpen]);
   const handleRemoveAttendee = (nameToRemove) => { setAttendees(attendees.filter((name) => name !== nameToRemove)); };
-  const handleSave = () => { onSave({ ...meetup, title, attendees, maxParticipants: meetup.maxParticipants || meetup.p || 10 }); };
+  const handleSave = () => {
+  onSave({
+    ...meetup,
+    title,
+    attendees,
+    maxParticipants: meetup.maxParticipants || meetup.p || 10,
+      }); };
   return (
     <AnimatePresence>
       {isOpen && (

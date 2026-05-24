@@ -252,6 +252,7 @@ export default function ActivityPage() {
   const [currentActivities, setCurrentActivities] = useState([]);
   const [invites, setInvites] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [places, setPlaces] = useState([]);
   const [dashboardFocus, setDashboardFocus] = useState(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMeetup, setChatMeetup] = useState(null);
@@ -292,6 +293,20 @@ export default function ActivityPage() {
     },
     [getMeetupDateTime]
   );
+
+  const fetchPlaces = useCallback(async () => {
+  try {
+    const res = await axios.get("http://localhost:5000/api/places", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    setPlaces(Array.isArray(res.data) ? res.data : []);
+  } catch (err) {
+    console.error("Error fetching places:", err);
+  }
+}, [token]);
 
   const fetchRealData = useCallback(async () => {
     try {
@@ -372,9 +387,11 @@ export default function ActivityPage() {
   }, [loggedInUser?.name]);
 
   useEffect(() => {
-    fetchRealData();
-    fetchNotifications();
-  }, [fetchRealData, fetchNotifications]);
+  fetchRealData();
+  fetchNotifications();
+  fetchPlaces();
+}, [fetchRealData, fetchNotifications, fetchPlaces]);
+
   useEffect(() => {
   socket.on("receive_meetup_message", (messageData) => {
     if (messageData.meetupId === chatMeetup?._id) {
@@ -535,56 +552,83 @@ export default function ActivityPage() {
   }
 };
 
-  const statsData = [
-    {
-      title: "Meetup Info",
-      items: [
-        {
-          label: "Place Name",
-          value: dashboardFocus?.title || "No Plans",
-          icon: "👑",
-        },
-        {
-          label: "Confirmed",
-          value: dashboardFocus?.attendees?.length || "0",
-          icon: "✅",
-        },
-      ],
-    },
-    {
-      title: "Status",
-      items: [
-        {
-          label: "Date",
-          value: dashboardFocus
-            ? new Date(dashboardFocus.date).toLocaleDateString()
-            : "-",
-          icon: "📅",
-        },
-        {
-          label: "Time",
-          value: dashboardFocus?.time || "-",
-          icon: "⏰",
-        },
-      ],
-    },
-    {
-      title: "Location Details",
-      items: [
-        {
-          label: "Location",
-          value: dashboardFocus?.location || "-",
-          icon: "📍",
-        },
-        {
-          label: "Weather",
-          value: "24°C",
-          icon: "☀️",
-        },
-      ],
-    },
-  ];
+const dashboardPlace = places.find((place) => {
+  const placeName = String(place.name || place.title || "")
+    .toLowerCase()
+    .trim();
 
+  const meetupLocation = String(dashboardFocus?.location || "")
+    .toLowerCase()
+    .trim();
+
+  return placeName === meetupLocation;
+});
+
+  const statsData = [
+  {
+    title: "Meetup Info",
+    items: [
+      {
+        label: "Meetup Title",
+        value: dashboardFocus?.title || "No Plans",
+        icon: "👑",
+      },
+      {
+        label: "Confirmed",
+        value: dashboardFocus?.attendees?.length || "0",
+        icon: "✅",
+      },
+    ],
+  },
+  {
+    title: "Status",
+    items: [
+      {
+        label: "Date",
+        value: dashboardFocus
+          ? new Date(dashboardFocus.date).toLocaleDateString()
+          : "-",
+        icon: "📅",
+      },
+      {
+        label: "Time",
+        value: dashboardFocus?.time || "-",
+        icon: "⏰",
+      },
+    ],
+  },
+  {
+    title: "Location Details",
+    items: [
+      {
+        label: "Place Name",
+        value:
+          dashboardPlace?.name ||
+          dashboardPlace?.title ||
+          dashboardFocus?.location ||
+          "-",
+        icon: "🗺️",
+      },
+      {
+        label: "Location",
+        value:
+          dashboardPlace?.location ||
+          dashboardPlace?.loc ||
+          dashboardFocus?.location ||
+          "-",
+        icon: "📍",
+      },
+      {
+        label: "Rating",
+        value:
+          dashboardPlace?.rating ||
+          dashboardPlace?.rate ||
+          "-",
+        icon: "⭐",
+      },
+    ],
+  },
+];
   return (
     <div className="activity-page-bg">
       <Toaster position="top-center" reverseOrder={false} />
