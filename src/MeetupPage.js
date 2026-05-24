@@ -28,6 +28,8 @@ export default function MeetupPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [userSearchTerm, setUserSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [showCategoryFilter, setShowCategoryFilter] = useState(false);
   const [selectedMeetup, setSelectedMeetup] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
@@ -35,6 +37,7 @@ export default function MeetupPage() {
   const [formData, setFormData] = useState(emptyForm);
   const [meetups, setMeetups] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [places, setPlaces] = useState([]);
 
   const participantsRef = useRef(null);
 
@@ -47,15 +50,23 @@ export default function MeetupPage() {
   const canJoinMeetups =
     loggedInUser?.permissions?.joinMeetups === false ? false : true;
 
-  const userInterests = useMemo(() => {
-    const interests =
-      loggedInUser?.interests ||
-      loggedInUser?.interest ||
-      loggedInUser?.categories ||
-      [];
+  const cleanText = useCallback((text) => {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^\w\s]/gi, "")
+    .trim();
+}, []);
 
-    return Array.isArray(interests) ? interests : [interests];
-  }, [loggedInUser]);
+const userInterests = useMemo(() => {
+  const interests =
+    loggedInUser?.interests ||
+    JSON.parse(localStorage.getItem("interests")) ||
+    [];
+
+  return Array.isArray(interests)
+    ? interests.map((item) => cleanText(item))
+    : [];
+}, [loggedInUser, cleanText]);
 
   const getPersonName = useCallback((person) => {
     if (!person) return "";
@@ -121,28 +132,50 @@ export default function MeetupPage() {
     },
     [loggedInUser?.id, loggedInUser?._id, loggedInUser?.name]
   );
+ 
+const interestCategoryMap = useMemo(() => ({
+  music: "activities event",
+  travel: "activities event",
+  sports: "activities event",
+  nature: "activities event",
 
-  const getInterestScore = useCallback(
-    (meetup) => {
-      if (!userInterests.length) return 0;
+  restaurants: "restaurants",
+  cafes: "cafes",
+  shopping: "shopping",
+  movies: "movies",
+}), []);  
 
-      const meetupText = `
-        ${meetup.title || ""}
-        ${meetup.location || ""}
-        ${meetup.notes || ""}
-        ${meetup.category || ""}
-        ${meetup.type || ""}
-      `.toLowerCase();
+ const getInterestScore = useCallback(
+  (meetup) => {
+    if (!userInterests.length) return 0;
 
-      return userInterests.reduce((score, interest) => {
-        const word = String(interest).toLowerCase().trim();
-        if (!word) return score;
+    const matchedPlace = places.find((place) => {
+      return (
+        cleanText(place.name) === cleanText(meetup.location) ||
+        cleanText(place.title) === cleanText(meetup.location)
+      );
+    });
 
-        return meetupText.includes(word) ? score + 50 : score;
-      }, 0);
-    },
-    [userInterests]
-  );
+    return userInterests.reduce((score, interest) => {
+      if (!interest) return score;
+
+      const meetupCategory = cleanText(
+  meetup.category ||
+  matchedPlace?.category ||
+  matchedPlace?.type
+);
+
+const mappedInterestCategory =
+  interestCategoryMap[interest] || interest;
+
+return meetupCategory.includes(mappedInterestCategory) ||
+  mappedInterestCategory.includes(meetupCategory)
+  ? score + 100
+  : score;
+    }, 0);
+  },
+  [userInterests, places, cleanText, interestCategoryMap]
+);
 
   const fetchMeetups = useCallback(async () => {
     try {
@@ -180,10 +213,26 @@ export default function MeetupPage() {
     }
   }, [loggedInUser?.name, token]);
 
+  const fetchPlaces = useCallback(async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/places", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      setPlaces(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Error fetching places:", err);
+      setPlaces([]);
+    }
+  }, [token]);
+
   useEffect(() => {
     fetchMeetups();
     fetchUsers();
-  }, [fetchMeetups, fetchUsers]);
+    fetchPlaces();
+  }, [fetchMeetups, fetchUsers, fetchPlaces]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -274,16 +323,82 @@ export default function MeetupPage() {
     isMeetupExpired,
   ]);
 
+  const meetupCategories = useMemo(() => {
+  return [
+    "All",
+    ...new Set(
+      places
+        .map((p) => p.category)
+        .filter(Boolean)
+       ),
+    ];
+    }, [places]);
+
   const filteredAllMeetups = useMemo(() => {
-    const query = searchTerm.toLowerCase();
+  const query = searchTerm.toLowerCase();
 
-    return allMeetups.filter((m) => {
-      const matchesTitle = (m.title || "").toLowerCase().includes(query);
-      const matchesLocation = (m.location || "").toLowerCase().includes(query);
+  return allMeetups.filter((m) => {
+    const matchesSearch =
+      (m.title || "").toLowerCase().includes(query) ||
+      (m.location || "").toLowerCase().includes(query);
 
-      return matchesTitle || matchesLocation;
+    const matchedPlace = places.find((place) => {
+      const placeName = cleanText(place.name || place.title);
+      const meetupPlace = cleanText(m.location);
+
+      return placeName === meetupPlace;
     });
-  }, [allMeetups, searchTerm]);
+
+    const meetupCategory = cleanText(
+      m.category ||
+      matchedPlace?.category ||
+      matchedPlace?.type ||
+      ""
+    );
+
+    const selected = cleanText(selectedCategory);
+
+    const matchesCategory =
+      selectedCategory === "All" || meetupCategory === selected;
+
+    return matchesSearch && matchesCategory;
+     });
+    }, [allMeetups, searchTerm, selectedCategory, places, cleanText]);
+
+  const findPlaceImage = useCallback(() => {
+    const typedPlaceName = formData.placeName.toLowerCase().trim();
+
+    const matchedPlace = places.find((place) => {
+      const dbPlaceName = (place.name || place.title || "")
+        .toLowerCase()
+        .trim();
+
+      return dbPlaceName === typedPlaceName;
+    });
+
+    return (
+      matchedPlace?.img ||
+      matchedPlace?.image ||
+      matchedPlace?.photo ||
+      matchedPlace?.imageUrl ||
+      matchedPlace?.mainImage ||
+      "https://picsum.photos/400/250"
+    );
+  }, [formData.placeName, places]);
+
+const normalizeText = (text) =>
+  String(text || "").toLowerCase().trim();
+
+const matchedPlace = useMemo(() => {
+  const typedPlaceName = normalizeText(formData.placeName);
+
+  if (!typedPlaceName) return null;
+
+  return places.find((place) => {
+    const placeName = normalizeText(place.name || place.title);
+    return placeName === typedPlaceName;
+  });
+}, [formData.placeName, places]);
 
   const handleCreateMeetup = async () => {
     if (
@@ -295,11 +410,17 @@ export default function MeetupPage() {
       return alert("Please fill required fields (Title, Place, Date, Time)");
     }
 
+  if (!matchedPlace) {
+  return alert("Please choose a place that exists in the database");
+}
+
     const selectedDateTime = new Date(`${formData.date}T${formData.time}`);
 
     if (selectedDateTime < new Date()) {
       return alert("You cannot create a meetup in the past");
     }
+
+    const meetupImage = findPlaceImage();
 
     const newMeetupData = {
       title: formData.meetupName,
@@ -311,7 +432,8 @@ export default function MeetupPage() {
       maxParticipants: Number(formData.maxParticipants) || 10,
       createdBy: loggedInUser?.name || "Guest",
       attendees: [loggedInUser?.name || "Host"],
-      img: `https://picsum.photos/400/250?random=${Math.random()}`,
+      img: meetupImage,
+      category: matchedPlace?.category || matchedPlace?.type || "",
     };
 
     try {
@@ -504,18 +626,48 @@ export default function MeetupPage() {
       </div>
 
       <div className="search-container-center" style={{ marginTop: "100px" }}>
-        <div className="search-wrapper-custom">
-          <Search className="search-glass-icon" />
+  <div className="search-filter-row">
+    <div className="search-wrapper-custom">
+      <Search className="search-glass-icon" />
 
-          <input
-            type="text"
-            placeholder="Search by title or place..."
-            className="main-search-input"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <input
+        type="text"
+        placeholder="Search by title or place..."
+        className="main-search-input"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+    </div>
+
+    <div className="category-filter-wrapper">
+      <button
+        className="category-filter-btn"
+        onClick={() => setShowCategoryFilter(!showCategoryFilter)}
+      >
+        ☰
+      </button>
+
+      {showCategoryFilter && (
+        <div className="category-filter-menu">
+          {meetupCategories.map((cat) => (
+            <button
+              key={cat}
+              className={`category-filter-option ${
+                selectedCategory === cat ? "active" : ""
+              }`}
+              onClick={() => {
+                setSelectedCategory(cat);
+                setShowCategoryFilter(false);
+              }}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
-      </div>
+      )}
+    </div>
+  </div>
+</div>
 
       {recommendedForYou.length > 0 && (
         <section className="recommendation-section">
@@ -547,7 +699,7 @@ export default function MeetupPage() {
             <img src={selectedMeetup.img} alt="popup" className="popup-image" />
 
             <div className="popup-body">
-              <h3>{selectedMeetup.title}</h3>
+              <h3 className="popup-meetup-title">{selectedMeetup.title}</h3>
 
               {selectedMeetup.notes && (
                 <p
@@ -601,29 +753,42 @@ export default function MeetupPage() {
 
                   {showParticipants && (
                     <div className="participants-dropdown">
-                      {(selectedMeetup.attendees || []).map((p, i) => {
-                        const name = getPersonName(p);
-                        const matchedUser = allUsers.find((u) => u.name === name);
+  {(selectedMeetup.attendees || []).map((p, i) => {
+    const name = getPersonName(p);
 
-                        const id =
-                          typeof p === "string"
-                            ? matchedUser?._id || matchedUser?.id
-                            : p.id || p._id;
+    const matchedUser = allUsers.find((u) => u.name === name);
 
-                        return (
-                          <div
-                            key={i}
-                            className="participant-row"
-                            onClick={() => {
-                              if (id) navigate(`/profile/${id}`);
-                            }}
-                            style={{ cursor: id ? "pointer" : "default" }}
-                          >
-                            {name}
-                          </div>
-                        );
-                      })}
-                    </div>
+    const id =
+      typeof p === "string"
+        ? matchedUser?._id || matchedUser?.id
+        : p.id || p._id;
+
+    const isHost =
+      name ===
+      (typeof selectedMeetup.createdBy === "string"
+        ? selectedMeetup.createdBy
+        : selectedMeetup.createdBy?.name);
+
+    return (
+      <div
+        key={i}
+        className="participant-row"
+        onClick={() => {
+          if (id) navigate(`/profile/${id}`);
+        }}
+        style={{ cursor: id ? "pointer" : "default" }}
+      >
+        <span>{name}</span>
+
+        {isHost && (
+          <span className="host-badge">
+            Host
+          </span>
+        )}
+      </div>
+    );
+  })}
+</div>
                   )}
                 </div>
               </div>
@@ -718,20 +883,28 @@ export default function MeetupPage() {
               <div className="input-group">
                 <label>Place Name</label>
 
-                <input
-                  type="text"
-                  value={formData.placeName}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      placeName: e.target.value,
-                    })
-                  }
-                />
-              </div>
+                <input type="text" list="places-list" value={formData.placeName}  placeholder="Choose place from database" onChange={(e) =>   setFormData({     ...formData,
+                 placeName: e.target.value,}) } 
+                 />
 
-              <div className="date-time-row">
-                <div className="input-group">
+                 <datalist id="places-list">
+                  {places.map((place) => (
+                    <option
+                    key={place._id}
+                    value={place.name || place.title}
+                   />
+                   ))}
+                  </datalist>
+
+                 {formData.placeName && !matchedPlace && (
+                 <p style={{ color: "#ff4d4d", fontSize: "13px", marginTop: "6px" }}>
+                 This place is not available in the database.
+                  </p>
+                 )}
+                 </div>
+
+                 <div className="date-time-row">
+                 <div className="input-group">
                   <label>Date</label>
 
                   <input
