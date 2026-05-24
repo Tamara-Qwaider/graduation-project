@@ -674,78 +674,11 @@ useEffect(() => {
   }
 };
 
-
 const totalUnreadMessages = Object.values(unreadCounts).reduce(
   (sum, count) => sum + count,
   0
 );
 
-const dashboardPlace = places.find((place) => {
-  const placeName = String(place.name || place.title || "")
-    .toLowerCase()
-    .trim();
-
-  const meetupLocation = String(dashboardFocus?.location || "")
-    .toLowerCase()
-    .trim();
-
-  return placeName === meetupLocation;
-});
-  const statsData = [
-    {
-      title: "Meetup Info",
-      items: [
-        {
-          label: "Place Name",
-          value: dashboardFocus?.title || "No Plans",
-          icon: "👑",
-        },
-        {
-          label: "Confirmed",
-          value: dashboardFocus?.attendees?.length || "0",
-          icon: "✅",
-        },
-      ],
-    },
-    {
-      title: "Status",
-      items: [
-        {
-          label: "Date",
-          value: dashboardFocus
-            ? new Date(dashboardFocus.date).toLocaleDateString()
-            : "-",
-          icon: "📅",
-        },
-        {
-          label: "Time",
-          value: dashboardFocus?.time || "-",
-          icon: "⏰",
-        },
-      ],
-    },
-    {
-      title: "Location Details",
-      items: [
-        {
-          label: "Location",
-          value: dashboardFocus?.location || "-",
-          icon: "📍",
-        },
-        {
-          label: "Weather",
-          value: "24°C",
-          icon: "☀️",
-        },
-      ],
-    },
-  ];
-  const totalUnreadMessages = Object.values(unreadCounts).reduce(
-  (sum, count) => sum + count,
-  0
-);
-
-  
 const dashboardPlace = places.find((place) => {
   const placeName = String(place.name || place.title || "")
     .toLowerCase()
