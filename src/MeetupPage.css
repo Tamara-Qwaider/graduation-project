@@ -1127,39 +1127,117 @@
   height: 46px;
   border-radius: 50%;
   border: none;
-  background: #ff7a00;
+
+  background: linear-gradient(135deg, #ff7a00, #ff9500);
   color: white;
+
   font-size: 20px;
   font-weight: 900;
+
   cursor: pointer;
+
+  margin-top: -75px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  box-shadow: 0 6px 18px rgba(255, 122, 0, 0.35);
+
+  transition: all 0.25s ease;
+}
+
+.category-filter-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+
+  box-shadow: 0 10px 24px rgba(255, 122, 0, 0.45);
 }
 
 .category-filter-menu {
   position: absolute;
-  top: 55px;
-  right: 0;
-  background: #111827;
-  border-radius: 16px;
+
+  top: -15px;
+  right: -5px;
+
+  background: rgba(8, 15, 35, 0.97);
+
+  backdrop-filter: blur(18px);
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  border-radius: 18px;
+
   padding: 10px;
-  min-width: 190px;
+
+  min-width: 210px;
+
   z-index: 9999;
+
+  box-shadow:
+    0 15px 35px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
+
+  animation: filterFade 0.22s ease;
 }
 
 .category-filter-option {
-  display: block;
+  display: flex;
+  align-items: center;
+
   width: 100%;
-  padding: 10px 12px;
+
+  padding: 12px 14px;
+
   border: none;
+
   background: transparent;
-  color: white;
+
+  color: rgba(255, 255, 255, 0.88);
+
   text-align: left;
-  border-radius: 10px;
+
+  border-radius: 12px;
+
   cursor: pointer;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  transition: all 0.2s ease;
 }
 
-.category-filter-option:hover,
+.category-filter-option:hover {
+  background: rgba(255, 122, 0, 0.15);
+
+  color: white;
+
+  transform: translateX(4px);
+}
+
 .category-filter-option.active {
-  background: #ff7a00;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 122, 0, 0.95),
+    rgba(255, 149, 0, 0.95)
+  );
+
+  color: white;
+
+  font-weight: 700;
+
+  box-shadow: 0 6px 16px rgba(255, 122, 0, 0.35);
+}
+
+@keyframes filterFade {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 .host-badge {
   margin-left: 8px;

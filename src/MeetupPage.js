@@ -40,6 +40,7 @@ export default function MeetupPage() {
   const [places, setPlaces] = useState([]);
 
   const participantsRef = useRef(null);
+  const categoryFilterRef = useRef(null);
 
   const loggedInUser = JSON.parse(localStorage.getItem("user"));
   const token = localStorage.getItem("token");
@@ -140,7 +141,7 @@ const interestCategoryMap = useMemo(() => ({
   nature: "activities event",
 
   restaurants: "restaurants",
-  cafes: "cafes",
+  cafes: ["cafes", "coffee houses"],
   shopping: "shopping",
   movies: "movies",
 }), []);  
@@ -257,6 +258,23 @@ return meetupCategory.includes(mappedInterestCategory) ||
       }));
     }
   }, [location.state]);
+
+  useEffect(() => {
+  const handleClickOutside = (e) => {
+    if (
+      categoryFilterRef.current &&
+      !categoryFilterRef.current.contains(e.target)
+    ) {
+      setShowCategoryFilter(false);
+    }
+  };
+
+  document.addEventListener("mousedown", handleClickOutside);
+
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  };
+}, []);
 
   const recommendedForYou = useMemo(() => {
     return [...meetups]
@@ -639,7 +657,7 @@ const matchedPlace = useMemo(() => {
       />
     </div>
 
-    <div className="category-filter-wrapper">
+    <div className="category-filter-wrapper" ref={categoryFilterRef}>
       <button
         className="category-filter-btn"
         onClick={() => setShowCategoryFilter(!showCategoryFilter)}
