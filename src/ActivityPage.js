@@ -349,7 +349,10 @@ export default function ActivityPage() {
       }
 
       const joined = activeMeetups.filter((m) => {
-        return m.createdBy === userName || m.attendees?.includes(userName);
+        return (
+          m.createdBy === userName ||
+          m.attendees?.includes(userName)
+        );
       });
 
       const targetedInvites = activeMeetups.filter((m) => {
@@ -454,6 +457,9 @@ useEffect(() => {
 
   useEffect(() => {
   socketRef.current = io("http://localhost:5000");
+  if (chatMeetup?._id) {
+  socketRef.current.emit("join_meetup_chat", chatMeetup._id);
+}
 
   socketRef.current.on("new_notification", (notification) => {
   if (notification.userName === loggedInUser?.name) {
@@ -468,16 +474,24 @@ useEffect(() => {
 
     if (exists) return prev;
 
-    if (messageData.senderId === userId) return prev;
-
     return [...prev, messageData];
   });
   if (
-    messageData.meetupId !== chatMeetup?._id &&
-    messageData.senderName !== loggedInUser?.name
-  ) {
-    fetchUnreadCounts();
-  }
+  messageData.meetupId !== chatMeetup?._id &&
+  messageData.senderName !== loggedInUser?.name
+) {
+  setUnreadCounts((prev) => {
+    const updated = {
+      ...prev,
+      [messageData.meetupId]: (prev[messageData.meetupId] || 0) + 1,
+    };
+
+    localStorage.setItem("unreadChatCounts", JSON.stringify(updated));
+    window.dispatchEvent(new Event("unreadChatUpdated"));
+
+    return updated;
+  });
+}
 });
 socketRef.current.on("user_typing", (data) => {
   if (
@@ -587,6 +601,12 @@ useEffect(() => {
   };
 
   const handleLeaveActivity = async (id) => {
+    const activity = currentActivities.find((m) => m._id === id);
+
+    if (activity?.createdBy === loggedInUser?.name) {
+      toast.error("Host cannot leave. Please cancel the meetup instead.");
+      return;
+    }
     if (!window.confirm("Are you sure you want to leave this activity?")) {
       return;
     }
@@ -874,7 +894,6 @@ const statsData = [
                       ...prev,
                       [activity._id]: 0,
                     }));
-                    socketRef.current.emit("join_meetup_chat", activity._id);
                     fetchMessages(activity._id);
                     markMessagesAsRead(activity._id);
                   }}

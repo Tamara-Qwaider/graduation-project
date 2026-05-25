@@ -760,3 +760,20 @@
   box-shadow: 0 0 14px rgba(255, 45, 85, 0.7);
   border: 2px solid #4e219b;
 }
+
+.activity-participants-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.activity-participants-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.activity-participants-scroll::-webkit-scrollbar-thumb {
+  background: #3b1d63;
+  border-radius: 999px;
+}
+
+.activity-participants-scroll::-webkit-scrollbar-thumb:hover {
+  background: #54258d;
+}

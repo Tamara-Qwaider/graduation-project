@@ -269,6 +269,41 @@ function Profile() {
     }
   };
 
+  const toggleSavedPlacesVisibility = async () => {
+  try {
+    const newVisibility =
+      (user.savedPlacesVisibility || "private") === "public"
+        ? "private"
+        : "public";
+
+    const res = await api.put(
+      `http://localhost:5000/api/users/profile/update/${user._id}`,
+      {
+        savedPlacesVisibility: newVisibility,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (res.data.user) {
+      const updatedUser = {
+        ...res.data.user,
+        savedPlacesVisibility: newVisibility,
+      };
+
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+
+    }
+  } catch (err) {
+    console.error("Visibility update error:", err);
+    alert("Could not update saved places privacy.");
+  }
+};
+
   return (
     <div style={containerStyle}>
       {isMyProfile && (
@@ -305,7 +340,44 @@ function Profile() {
                 boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
               }}
             >
-              <button onClick={handleLogout} style={menuItemStyle}>
+              <button 
+              onClick={() => navigate("/history")} 
+              style={menuItemStyle} 
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background =
+                 "rgba(255,255,255,0.08)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 18px rgba(255,255,255,0.12)";
+                e.currentTarget.style.transform =
+                  "translateX(4px) scale(1.03)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.transform =
+                  "translateX(0px) scale(1)";
+              }}>
+                Meetup History
+              </button>
+
+              <button 
+                onClick={handleLogout} 
+                style={menuItemStyle}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background =
+                    "rgba(255,255,255,0.08)";
+                  e.currentTarget.style.boxShadow =
+                    "0 0 18px rgba(255,255,255,0.12)";
+                  e.currentTarget.style.transform =
+                    "translateX(4px) scale(1.03)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.transform =
+                    "translateX(0px) scale(1)";
+                }} 
+              >
                 Logout 
               </button>
 
@@ -314,6 +386,20 @@ function Profile() {
                 style={{
                   ...menuItemStyle,
                   color: "#ff6b6b",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background =
+                    "rgba(255,255,255,0.08)";
+                  e.currentTarget.style.boxShadow =
+                    "0 0 18px rgba(255,255,255,0.12)";
+                  e.currentTarget.style.transform =
+                    "translateX(4px) scale(1.03)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.transform =
+                    "translateX(0px) scale(1)";
                 }}
               >
                 Delete Account 
@@ -413,8 +499,30 @@ function Profile() {
             </div>
           </SectionBox>
 
-          {isMyProfile && (
-            <SectionBox title="Saved Places ❤️">
+          {(isMyProfile || user.savedPlacesVisibility === "public") ? (
+            <SectionBox
+              title={
+               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>Saved Places ❤️</span>
+
+                 {isMyProfile && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleSavedPlacesVisibility();
+                      }}
+                      style={privacyBtnStyle}
+                    >
+                      {(user.savedPlacesVisibility || "private") === "public"
+                        ? "Public 🌍"
+                        : "Private 🔒"}
+                    </button>
+                 )}
+                </div>
+              }
+            > 
             <div style={placesGrid}>
               {user.savedPlaces && user.savedPlaces.length > 0 ? (
                 user.savedPlaces.map((place, i) => (
@@ -442,7 +550,11 @@ function Profile() {
               )}
             </div>
           </SectionBox>
-          )}
+        ) : (
+          <SectionBox title="Saved Places 🔒">
+            <p style={bodyText}>This user's saved places are private.</p>
+          </SectionBox>
+        )}
         </div>
       </div>
       
@@ -519,10 +631,20 @@ const placeCardStyle = { background: "rgba(0, 0, 0, 0.2)", borderRadius: "16px",
 const placeImgStyle = { width: "100%", height: "130px", objectFit: "cover" };
 const placeLocStyle = { color: "rgba(255,255,255,0.6)", fontSize: "12px", margin: 0 };
 const removeBtnStyle = { position: "absolute", top: "8px", right: "8px", background: "rgba(255, 50, 50, 0.8)", color: "white", border: "none", borderRadius: "50%", width: "26px", height: "26px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", zIndex: 2 };
-const menuItemStyle = { width: "100%", padding: "14px 18px", background: "transparent", border: "none", color: "white", textAlign: "left", cursor: "pointer", fontSize: "14px" };
+const menuItemStyle = {width: "100%",padding: "14px 18px",background: "transparent",border: "none",color: "white",textAlign: "left",cursor: "pointer",fontSize: "14px",transition: "all 0.25s ease",};
 const modalOverlayStyle = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 };
 const deleteModalStyle = { width: "90%", maxWidth: "420px", background: "#1e1b4b", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "22px", padding: "28px", color: "white", textAlign: "center" };
 const cancelDeleteBtnStyle = { flex: 1, padding: "12px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.08)", color: "white", cursor: "pointer" };
 const confirmDeleteBtnStyle = { flex: 1, padding: "12px", borderRadius: "12px", border: "none", background: "#dc2626", color: "white", cursor: "pointer", fontWeight: "bold" };
+const privacyBtnStyle = {
+  padding: "7px 12px",
+  borderRadius: "999px",
+  border: "1px solid rgba(255,255,255,0.15)",
+  background: "rgba(255,255,255,0.08)",
+  color: "white",
+  cursor: "pointer",
+  fontWeight: "700",
+  fontSize: "12px",
+};
 
 export default Profile;

@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { auth } from "./firebase";
-import { sendPasswordResetEmail } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 
 
@@ -8,8 +6,6 @@ export default function LoginPage() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  
 
   const navigate = useNavigate();
 
@@ -75,21 +71,7 @@ export default function LoginPage() {
   const handleSignup = () => {
     navigate("/signup");
   };
-  const handleForgotPassword = async () => {
-  try {
-    if (!identifier) {
-      setError("Enter your email first");
-      return;
-    }
 
-    await sendPasswordResetEmail(auth, identifier);
-
-    setMessage("Password reset email sent 📩");
-    setError("");
-  } catch (err) {
-    setError("Failed to send reset email");
-  }
-};
 
   return (
     <div
@@ -172,28 +154,11 @@ export default function LoginPage() {
                 color: "white",
               }}
             />
-            <p
-              onClick={handleForgotPassword}
-              style={{
-                color: "#c084fc",
-                marginTop: "10px",
-                cursor: "pointer",
-                fontSize: "14px",
-                textAlign: "right",
-              }}
-            >
-              Forgot Password?
-            </p>
 
             {error && (
               <p style={{ color: "#f87171", marginTop: "10px", fontSize: "14px" }}>
                 {error}
               </p>
-            )}
-            {message && (
-              <p style={{ color: "#4ade80", marginTop: "10px", fontSize: "14px" }}>
-                {message}
-             </p>
             )}
 
             <button

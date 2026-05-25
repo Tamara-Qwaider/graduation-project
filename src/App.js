@@ -9,6 +9,7 @@ import MeetupPage from "./MeetupPage";
 import ProtectedRoute from "./ProtectedRoute";
 import ActivityPage from "./ActivityPage";
 import AdminPage from "./AdminPage";
+import MeetupHistory from "./MeetupHistory";
 
 function App() {
   return (
@@ -69,6 +70,7 @@ function App() {
         }
       />
       
+      
       <Route
         path="/admin"
         element={
@@ -77,7 +79,17 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route
+       path="/history" 
+       element={
+         <ProtectedRoute>
+           <MeetupHistory />
+         </ProtectedRoute>
+        } 
+      />
     </Routes>
+  
   );
 }
 
