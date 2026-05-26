@@ -268,8 +268,12 @@ export default function ActivityPage() {
   const [newMessage, setNewMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [typingUser, setTypingUser] = useState("");
+  const loggedInUser = JSON.parse(localStorage.getItem("user"));
+  const userId = loggedInUser?._id || loggedInUser?.id;
+  const userName = loggedInUser?.name;
+  const token = localStorage.getItem("token");
   const [unreadCounts, setUnreadCounts] = useState(() => {
-    const saved = localStorage.getItem("unreadChatCounts");
+    const saved = localStorage.getItem(`unreadChatCounts_${userId}`);
     return saved ? JSON.parse(saved) : {};
   });
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -277,10 +281,6 @@ export default function ActivityPage() {
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
-  const loggedInUser = JSON.parse(localStorage.getItem("user"));
-  const userId = loggedInUser?._id || loggedInUser?.id;
-  const userName = loggedInUser?.name;
-  const token = localStorage.getItem("token");
 
   const getMeetupDateTime = useCallback((meetup) => {
     if (meetup?.expiresAt) {
@@ -451,9 +451,15 @@ useEffect(() => {
 }, [fetchRealData, fetchNotifications, fetchUnreadCounts]);
 
   useEffect(() => {
-  localStorage.setItem("unreadChatCounts", JSON.stringify(unreadCounts));
+  if (!userId) return;
+
+  localStorage.setItem(
+    `unreadChatCounts_${userId}`,
+    JSON.stringify(unreadCounts)
+  );
+
   window.dispatchEvent(new Event("unreadChatUpdated"));
-}, [unreadCounts]);
+}, [unreadCounts, userId]);
 
   useEffect(() => {
   socketRef.current = io("http://localhost:5000");
@@ -486,7 +492,10 @@ useEffect(() => {
       [messageData.meetupId]: (prev[messageData.meetupId] || 0) + 1,
     };
 
-    localStorage.setItem("unreadChatCounts", JSON.stringify(updated));
+    localStorage.setItem(
+      `unreadChatCounts_${userId}`,
+      JSON.stringify(updated)
+    );
     window.dispatchEvent(new Event("unreadChatUpdated"));
 
     return updated;

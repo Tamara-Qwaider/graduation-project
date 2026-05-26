@@ -5,7 +5,7 @@ import axios from "axios";
 export default function Navbar({ unreadMessages = 0 }) {
   const location = useLocation();
   const [storedUnread, setStoredUnread] = useState(0);
-  const fetchUnreadFromBackend = async () => {
+   const fetchUnreadFromBackend = async () => {
   try {
     const user = JSON.parse(localStorage.getItem("user"));
     const userId = user?._id || user?.id;
@@ -17,8 +17,16 @@ export default function Navbar({ unreadMessages = 0 }) {
     );
 
     const counts = res.data || {};
+    if (Object.keys(counts).length === 0) {
+      localStorage.removeItem(`unreadChatCounts_${userId}`);
+      setStoredUnread(0);
+      return;
+}
 
-    localStorage.setItem("unreadChatCounts", JSON.stringify(counts));
+    localStorage.setItem(
+      `unreadChatCounts_${userId}`,
+      JSON.stringify(counts)
+    );
 
     const total = Object.values(counts).reduce(
       (sum, count) => sum + count,
@@ -33,7 +41,15 @@ export default function Navbar({ unreadMessages = 0 }) {
 
 useEffect(() => {
   const updateUnread = () => {
-    const saved = localStorage.getItem("unreadChatCounts");
+    const user = JSON.parse(localStorage.getItem("user"));
+    const userId = user?._id || user?.id;
+
+    if (!userId) {
+      setStoredUnread(0);
+      return;
+    }
+
+    const saved = localStorage.getItem(`unreadChatCounts_${userId}`);
     const counts = saved ? JSON.parse(saved) : {};
 
     const total = Object.values(counts).reduce(
