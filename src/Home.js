@@ -7,7 +7,7 @@ import "./HomePage.css";
 export default function Home() {
   const [selected, setSelected] = useState(null);
   const [search, setSearch] = useState("");
-  const [tripPlan, setTripPlan] = useState("");
+  const [tripPlan, setTripPlan] = useState(null);
   const [showTripPlan, setShowTripPlan] = useState(false);
 
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -46,7 +46,7 @@ export default function Home() {
 
     const data = await res.json();
 
-    setTripPlan(data.tripPlan);
+    setTripPlan(data);
     setShowTripPlan(true);
   } catch (err) {
     console.error(err);
@@ -286,14 +286,21 @@ const getRecommendationScore = (place) => {
     }
   });
   savedPlaces.forEach((saved) => {
-  const savedCategory = cleanText(saved.category);
+  const samePlace =
+    (saved._id || saved.id) === (place._id || place.id);
 
-  if (savedCategory === placeCategory) {
-    score += 3;
-  }
+  if (samePlace) return;
 
-  if (cleanText(saved.location) === cleanText(place.location)) {
-    score += 1;
+  const sameCategory =
+    cleanText(saved.category) === placeCategory;
+
+  const sameLocation =
+    cleanText(saved.location) === cleanText(place.location);
+
+  if (sameCategory && sameLocation) {
+    score += 1.2;
+  } else if (sameCategory) {
+    score += 0.4;
   }
 });
 
@@ -330,6 +337,38 @@ if (
   return score;
 };
 
+const getUniquePlaces = (groups) => {
+  const seen = new Set();
+  const result = [];
+
+  groups.flat().forEach((place) => {
+    const id = place._id || place.id;
+
+    if (!id || seen.has(id)) return;
+
+    seen.add(id);
+    result.push(place);
+  });
+
+  return result.slice(0, 5);
+};
+
+const limitCategoryRepeats = (places, maxPerCategory = 2) => {
+  const categoryCount = {};
+  const result = [];
+
+  places.forEach((place) => {
+    const category = cleanText(place.category || "unknown");
+
+    if ((categoryCount[category] || 0) >= maxPerCategory) return;
+
+    categoryCount[category] = (categoryCount[category] || 0) + 1;
+    result.push(place);
+  });
+
+  return result;
+};
+
 const getRecommendationReason = (place) => {
   const placeCategory = cleanText(place.category);
   const placeName = cleanText(place.name);
@@ -349,9 +388,21 @@ const getRecommendationReason = (place) => {
     );
   });
 
-  const matchedSavedPlace = savedPlaces.find(
-  (saved) => cleanText(saved.category) === placeCategory
-);
+ const matchedSavedPlace = savedPlaces.find((saved) => {
+  const samePlace =
+    (saved._id || saved.id) === (place._id || place.id);
+
+  if (samePlace) return false;
+
+  const sameCategory =
+    cleanText(saved.category) === placeCategory;
+
+  const sameLocation =
+    cleanText(saved.location) === cleanText(place.location);
+
+  return sameCategory && sameLocation;
+});
+
 
 if (matchedSavedPlace) {
   return `Because you saved ${matchedSavedPlace.name}`;
@@ -368,26 +419,122 @@ if (matchedSavedPlace) {
   return "Popular recommendation";
 };
 
-const recommendedPlaces = placesData
-  .map((place) => ({
-    ...place,
-    recommendationScore: getRecommendationScore(place),
-    recommendationReason: getRecommendationReason(place),
-  }))
-  .filter((place) =>
-    userInterests.length > 0 || viewedPlaces.length > 0
-      ? place.recommendationScore >=4
-      : (place.rating || 0) >= 4.5
-  )
-  
-  .sort((a, b) => {
-    if (b.recommendationScore !== a.recommendationScore) {
-      return b.recommendationScore - a.recommendationScore;
-    }
+const recommendedPlaces = (() => {
+  const unsavedPlaces = placesData.filter((place) => {
+    return !savedPlaces.some(
+      (saved) => (saved._id || saved.id) === (place._id || place.id)
+    );
+  });
 
-    return (b.rating || 0) - (a.rating || 0);
-  })
-  .slice(0, 5);
+  // recommendations based on interests
+  const interestBased = unsavedPlaces
+    .map((place) => ({
+      ...place,
+      recommendationScore: getRecommendationScore(place),
+      recommendationReason: getRecommendationReason(place),
+    }))
+    .filter((place) => {
+      return userInterests.some((interest) => {
+        const cleanInterest = cleanText(interest);
+
+        const mappedInterestCategory =
+          interestCategoryMap[cleanInterest] || cleanInterest;
+
+        const placeCategory = cleanText(place.category);
+        const placeName = cleanText(place.name);
+        const placeDescription = cleanText(place.description);
+
+        return (
+          placeCategory.includes(mappedInterestCategory) ||
+          mappedInterestCategory.includes(placeCategory) ||
+          placeName.includes(cleanInterest) ||
+          placeDescription.includes(cleanInterest)
+        );
+      });
+    })
+    .slice(0, 2);
+
+  // recommendations based on viewed behavior
+  const behaviorBased = unsavedPlaces
+    .map((place) => {
+      const isRelatedToViewed = viewedPlaces.some((viewed) => {
+        return (
+          cleanText(viewed.category) === cleanText(place.category) ||
+          cleanText(viewed.location) === cleanText(place.location)
+        );
+      });
+
+      return {
+        ...place,
+        recommendationScore: getRecommendationScore(place),
+        recommendationReason: isRelatedToViewed
+          ? "Because you viewed similar places"
+          : getRecommendationReason(place),
+        isRelatedToViewed,
+      };
+    })
+    .filter((place) => place.isRelatedToViewed)
+    .slice(0, 1);
+
+  // recommendations based on saved places
+  const savedBased = unsavedPlaces
+    .map((place) => {
+      const matchedSavedPlace = savedPlaces.find((saved) => {
+        const sameCategory =
+          cleanText(saved.category) === cleanText(place.category);
+
+        const sameLocation =
+          cleanText(saved.location) === cleanText(place.location);
+
+        return sameCategory && sameLocation;
+      });
+
+      return {
+        ...place,
+        recommendationScore: getRecommendationScore(place),
+        recommendationReason: matchedSavedPlace
+          ? `Because you saved ${matchedSavedPlace.name}`
+          : getRecommendationReason(place),
+        matchedSavedPlace,
+      };
+    })
+    .filter((place) => place.matchedSavedPlace)
+    .slice(0, 1);
+
+  // top rated recommendations
+  const ratingBased = unsavedPlaces
+    .map((place) => ({
+      ...place,
+      recommendationScore: getRecommendationScore(place),
+      recommendationReason: "Top rated place",
+    }))
+    .filter((place) => (place.rating || 0) >= 4.5)
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    .slice(0, 1);
+
+  // fallback recommendations
+  const fallbackRecommendations = unsavedPlaces
+    .map((place) => ({
+      ...place,
+      recommendationScore: getRecommendationScore(place),
+      recommendationReason: getRecommendationReason(place),
+    }))
+    .sort(
+      (a, b) => b.recommendationScore - a.recommendationScore
+    );
+
+  return limitCategoryRepeats(
+  getUniquePlaces([
+    interestBased,
+    behaviorBased,
+    savedBased,
+    ratingBased,
+    fallbackRecommendations,
+  ]),
+  2
+);
+})();
+
 
   return (
     <div className="home-page-bg" style={{ position: "relative" }}>
@@ -418,8 +565,23 @@ const recommendedPlaces = placesData
               >
                 ✕
               </button>
+            <h3>{tripPlan.title}</h3>
+            <span className="trip-vibe-badge">{tripPlan.vibe}</span>
             <h2>🤖 AI Trip Plan</h2>
-            <p>{tripPlan}</p>
+            <p>{tripPlan.summary}</p>
+
+            <div className="ai-schedule-list">
+              {tripPlan.schedule?.map((item, index) => (
+                <div key={index} className="ai-schedule-card">
+                  <h3>
+                    {item.emoji} {item.time}
+                 </h3>
+                 <strong>{item.placeName}</strong>
+                 <p>{item.reason}</p>
+                 <small>Tip: {item.tip}</small>
+               </div>
+              ))}
+            </div>
           </div>
         )}
         <div className="home-search-wrapper">

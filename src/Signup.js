@@ -74,6 +74,27 @@ export default function SignupPage() {
     await auth.currentUser.reload();
 
     if (auth.currentUser.emailVerified) {
+      const res = await fetch("http://localhost:5000/api/auth/signup", {
+        method: "POST",
+       headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email: cleanEmail,
+          password,
+          interests: [],
+          firebaseUID: auth.currentUser.uid,
+          emailVerified: true,
+        }),
+      });
+
+      const signupData = await res.json();
+
+      if (!res.ok) {
+        setError(signupData.message || "Signup failed");
+         return;
+      }
       await fetch("http://localhost:5000/api/auth/verify-email", {
         method: "PUT",
         headers: {
@@ -82,7 +103,7 @@ export default function SignupPage() {
         body: JSON.stringify({ email: cleanEmail }),
       });
 
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      const loginRes = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -90,13 +111,12 @@ export default function SignupPage() {
         body: JSON.stringify({
           identifier: cleanEmail,
           password,
-        })
-    
+        }),
       });
 
-      const data = await res.json();
+      const data = await loginRes.json();
 
-      if (!res.ok) {
+      if (!loginRes.ok) {
         setError(data.message || "Login failed");
         return;
       }
@@ -114,7 +134,6 @@ export default function SignupPage() {
       setError("Please verify your email first 📩");
 
     }
-
     return;
   }
 
@@ -128,28 +147,6 @@ export default function SignupPage() {
   await sendEmailVerification(userCredential.user);
 
   setVerificationSent(true);
-
-  const res = await fetch("http://localhost:5000/api/auth/signup", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      name,
-      email: cleanEmail,
-      password,
-      interests: [],
-      firebaseUID: userCredential.user.uid,
-      emailVerified: false,
-    }),
-  });
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    setError(data.message || "Signup failed");
-    return;
-  }
 
   setMessage(
   "Verification email sent 📩 Please verify then press Continue"
@@ -238,6 +235,7 @@ export default function SignupPage() {
               <input
                 name="name"
                 type="text"
+                disabled={verificationSent}
                 placeholder="Enter your username"
                 style={{
                   width: "100%",
@@ -257,6 +255,7 @@ export default function SignupPage() {
               <label style={{ color: "rgba(255,255,255,0.8)" }}>Email</label>
               <input
                 name="email"
+                disabled={verificationSent}
                 type="email"
                 placeholder="name@example.com"
                 style={{
@@ -276,6 +275,7 @@ export default function SignupPage() {
               <input
                 name="password"
                 type="password"
+                disabled={verificationSent}
                 placeholder="Create a strong password"
                 style={{
                   width: "100%",
@@ -294,6 +294,7 @@ export default function SignupPage() {
               <input
                 name="confirmPassword"
                 type="password"
+                disabled={verificationSent}
                 placeholder="Repeat password"
                 style={{
                   width: "100%",

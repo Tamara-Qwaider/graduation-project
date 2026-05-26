@@ -272,8 +272,12 @@ export default function ActivityPage() {
   const [newMessage, setNewMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [typingUser, setTypingUser] = useState("");
+  const loggedInUser = JSON.parse(localStorage.getItem("user"));
+  const userId = loggedInUser?._id || loggedInUser?.id;
+  const userName = loggedInUser?.name;
+  const token = localStorage.getItem("token");
   const [unreadCounts, setUnreadCounts] = useState(() => {
-    const saved = localStorage.getItem("unreadChatCounts");
+    const saved = localStorage.getItem(`unreadChatCounts_${userId}`);
     return saved ? JSON.parse(saved) : {};
   });
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -281,10 +285,6 @@ export default function ActivityPage() {
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
-  const loggedInUser = JSON.parse(localStorage.getItem("user"));
-  const userId = loggedInUser?._id || loggedInUser?.id;
-  const userName = loggedInUser?.name;
-  const token = localStorage.getItem("token");
 
   const getMeetupDateTime = useCallback((meetup) => {
     if (meetup?.expiresAt) {
@@ -353,7 +353,10 @@ export default function ActivityPage() {
       }
 
       const joined = activeMeetups.filter((m) => {
-        return m.createdBy === userName || m.attendees?.includes(userName);
+        return (
+          m.createdBy === userName ||
+          m.attendees?.includes(userName)
+        );
       });
 
       const targetedInvites = activeMeetups.filter((m) => {
@@ -454,12 +457,21 @@ useEffect(() => {
 ]);
 
   useEffect(() => {
-  localStorage.setItem("unreadChatCounts", JSON.stringify(unreadCounts));
+  if (!userId) return;
+
+  localStorage.setItem(
+    `unreadChatCounts_${userId}`,
+    JSON.stringify(unreadCounts)
+  );
+
   window.dispatchEvent(new Event("unreadChatUpdated"));
-}, [unreadCounts]);
+}, [unreadCounts, userId]);
 
   useEffect(() => {
   socketRef.current = io("http://localhost:5000");
+  if (chatMeetup?._id) {
+  socketRef.current.emit("join_meetup_chat", chatMeetup._id);
+}
 
   socketRef.current.on("new_notification", (notification) => {
   if (notification.userName === loggedInUser?.name) {
@@ -477,16 +489,27 @@ useEffect(() => {
 
     if (exists) return prev;
 
-    if (messageData.senderId === userId) return prev;
-
     return [...prev, messageData];
   });
   if (
-    messageData.meetupId !== chatMeetup?._id &&
-    messageData.senderName !== loggedInUser?.name
-  ) {
-    fetchUnreadCounts();
-  }
+  messageData.meetupId !== chatMeetup?._id &&
+  messageData.senderName !== loggedInUser?.name
+) {
+  setUnreadCounts((prev) => {
+    const updated = {
+      ...prev,
+      [messageData.meetupId]: (prev[messageData.meetupId] || 0) + 1,
+    };
+
+    localStorage.setItem(
+      `unreadChatCounts_${userId}`,
+      JSON.stringify(updated)
+    );
+    window.dispatchEvent(new Event("unreadChatUpdated"));
+
+    return updated;
+  });
+}
 });
 socketRef.current.on("user_typing", (data) => {
   if (
@@ -608,6 +631,12 @@ useEffect(() => {
 };
 
   const handleLeaveActivity = async (id) => {
+    const activity = currentActivities.find((m) => m._id === id);
+
+    if (activity?.createdBy === loggedInUser?.name) {
+      toast.error("Host cannot leave. Please cancel the meetup instead.");
+      return;
+    }
     if (!window.confirm("Are you sure you want to leave this activity?")) {
       return;
     }
@@ -895,7 +924,6 @@ const statsData = [
                       ...prev,
                       [activity._id]: 0,
                     }));
-                    socketRef.current.emit("join_meetup_chat", activity._id);
                     fetchMessages(activity._id);
                     markMessagesAsRead(activity._id);
                   }}

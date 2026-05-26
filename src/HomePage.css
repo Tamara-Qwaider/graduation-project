@@ -490,3 +490,14 @@
 .close-ai-box:hover {
   color: white;
 }
+.trip-vibe-badge {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.18);
+  color: #d8b4fe;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
