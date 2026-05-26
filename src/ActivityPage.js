@@ -4,6 +4,7 @@ import axios from "axios";
 import "./ActivityPage.css";
 import toast, { Toaster } from "react-hot-toast";
 import { io } from "socket.io-client";
+import { useNavigate } from "react-router-dom";
 import EmojiPicker from "emoji-picker-react";
 
 /* ==========================================================================
@@ -249,17 +250,46 @@ const StatCircle = ({ title, items }) => (
   </div>
 );
 
+const MutualInterestCard = ({ user, onClick }) => (
+  <div className="mutual-user-card" onClick={onClick}>
+    <img
+      src={
+        user.image ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(
+          user.name || "User"
+        )}&background=6d28d9&color=fff`
+      }
+      alt={user.name}
+      className="mutual-user-img"
+    />
+
+    <div className="mutual-user-info">
+      <h4>{user.name}</h4>
+
+      {user.sameLocation && (
+        <span className="same-location-badge">📍 Same area</span>
+      )}
+
+      <p>
+        {user.sharedInterests?.slice(0, 3).join(", ")}
+      </p>
+    </div>
+  </div>
+);
+
 
 /* ==========================================================================
    2. Main Page Component
    ========================================================================== */
 
 export default function ActivityPage() {
+  const navigate = useNavigate();
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [currentActivities, setCurrentActivities] = useState([]);
   const [invites, setInvites] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [mutualUsers, setMutualUsers] = useState([]);
   const [places, setPlaces] = useState([]);
   const [dashboardFocus, setDashboardFocus] = useState(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -420,11 +450,32 @@ export default function ActivityPage() {
   }
 }, [userId]);
 
+const fetchMutualUsers = useCallback(async () => {
+  try {
+    if (!userId) return;
+
+    const res = await axios.get(
+      `http://localhost:5000/api/users/mutual/${userId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    setMutualUsers(Array.isArray(res.data) ? res.data : []);
+  } catch (err) {
+    console.error("Error fetching mutual users:", err);
+    setMutualUsers([]);
+  }
+}, [userId, token]);
+
   useEffect(() => {
   fetchRealData();
   fetchNotifications();
   fetchPlaces();
-}, [fetchRealData, fetchNotifications, fetchPlaces]);
+  fetchMutualUsers();
+}, [fetchRealData, fetchNotifications, fetchPlaces, fetchMutualUsers]);
 
 useEffect(() => {
   const handleClickOutside = (e) => {
@@ -1064,6 +1115,22 @@ const statsData = [
               </div>
             </div>
           </div>
+        )}
+
+       {mutualUsers.length > 0 && (
+         <section className="activity-section">
+           <h3 className="section-heading">Mutual Interests</h3>
+
+            <div className="mutual-users-scroll">
+              {mutualUsers.map((user) => (
+                <MutualInterestCard
+                  key={user._id}
+                  user={user}
+                  onClick={() => navigate(`/profile/${user._id}`)}
+                />
+              ))}
+           </div>
+         </section>
         )}
       </main>
     </div>
