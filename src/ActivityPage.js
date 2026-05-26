@@ -205,8 +205,12 @@ const NotificationCard = ({ notification, onRead, onDelete }) => (
   <div className="invite-card">
     <div className="invite-card-top">
       <div className="invite-icon">
-        {notification.type === "delete" ? "🗑️" : "✏️"}
-      </div>
+     {notification.type === "delete"
+        ? "🗑️"
+        : notification.type === "join"
+        ? "🎉"
+        : "✏️"}
+       </div>
 
       <div>
         <h3>{notification.meetupTitle}</h3>
@@ -417,11 +421,7 @@ export default function ActivityPage() {
   }
 }, [userId]);
 
-  useEffect(() => {
-  fetchRealData();
-  fetchNotifications();
-  fetchPlaces();
-}, [fetchRealData, fetchNotifications, fetchPlaces]);
+
 
 useEffect(() => {
   const handleClickOutside = (e) => {
@@ -445,7 +445,13 @@ useEffect(() => {
   fetchRealData();
   fetchNotifications();
   fetchUnreadCounts();
-}, [fetchRealData, fetchNotifications, fetchUnreadCounts]);
+  fetchPlaces();
+}, [
+  fetchRealData,
+  fetchNotifications,
+  fetchUnreadCounts,
+  fetchPlaces,
+]);
 
   useEffect(() => {
   localStorage.setItem("unreadChatCounts", JSON.stringify(unreadCounts));
@@ -458,9 +464,12 @@ useEffect(() => {
   socketRef.current.on("new_notification", (notification) => {
   if (notification.userName === loggedInUser?.name) {
     setNotifications((prev) => [notification, ...prev]);
+
+    fetchNotifications();
+
     toast(notification.message);
-   }
-    });
+  }
+});
 
   socketRef.current.on("receive_meetup_message", (messageData) => {
   setMessages((prev) => {
@@ -498,7 +507,13 @@ socketRef.current.on("user_stop_typing", (data) => {
     socketRef.current.off("new_notification");
     socketRef.current.disconnect();
   };
-}, [chatMeetup?._id, loggedInUser?.name, fetchUnreadCounts, userId]);
+}, [
+  chatMeetup?._id,
+  loggedInUser?.name,
+  fetchUnreadCounts,
+  fetchNotifications,
+  userId,
+]);
 
 
 useEffect(() => {
@@ -562,29 +577,35 @@ useEffect(() => {
   };
 
   const handleJoin = async (id) => {
-    try {
-      const res = await axios.put(
-        `http://localhost:5000/api/meetups/${id}/join`,
-        {
-          userName: loggedInUser.name,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+  console.log("JOIN CLICKED:", id);
 
-      if (res.status === 200) {
-        toast.success("Joined successfully! 🎉");
-        fetchRealData();
+  try {
+    const res = await axios.put(
+      `http://localhost:5000/api/meetups/${id}/join`,
+      {
+        userName: loggedInUser.name,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       }
-    } catch (err) {
-      console.error("JOIN ERROR:", err.response?.data || err);
-      toast.error(err.response?.data?.message || "Error joining activity.");
+    );
+
+    if (res.status === 200) {
+      toast.success("Joined successfully! 🎉");
       fetchRealData();
     }
-  };
+  } catch (err) {
+    console.error("JOIN ERROR:", err.response?.data || err);
+
+    toast.error(
+      err.response?.data?.message || "Error joining activity."
+    );
+
+    fetchRealData();
+  }
+};
 
   const handleLeaveActivity = async (id) => {
     if (!window.confirm("Are you sure you want to leave this activity?")) {

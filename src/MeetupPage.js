@@ -352,13 +352,33 @@ return meetupCategory.includes(mappedInterestCategory) ||
     ];
     }, [places]);
 
-  const filteredAllMeetups = useMemo(() => {
-  const query = searchTerm.toLowerCase();
+  const sortBySearchPriority = useCallback((items, query, getText) => {
+  const q = cleanText(query);
 
-  return allMeetups.filter((m) => {
+  if (!q) return items;
+
+  return [...items].sort((a, b) => {
+    const aText = cleanText(getText(a));
+    const bText = cleanText(getText(b));
+
+    const aStarts = aText.startsWith(q);
+    const bStarts = bText.startsWith(q);
+
+    if (aStarts && !bStarts) return -1;
+    if (!aStarts && bStarts) return 1;
+
+    return aText.localeCompare(bText);
+  });
+}, [cleanText]);
+
+ const filteredAllMeetups = useMemo(() => {
+  const query = cleanText(searchTerm);
+
+  const filtered = allMeetups.filter((m) => {
+    const meetupText = `${m.title || ""} ${m.location || ""}`;
+
     const matchesSearch =
-      (m.title || "").toLowerCase().includes(query) ||
-      (m.location || "").toLowerCase().includes(query);
+      !query || cleanText(meetupText).includes(query);
 
     const matchedPlace = places.find((place) => {
       const placeName = cleanText(place.name || place.title);
@@ -380,8 +400,21 @@ return meetupCategory.includes(mappedInterestCategory) ||
       selectedCategory === "All" || meetupCategory === selected;
 
     return matchesSearch && matchesCategory;
-     });
-    }, [allMeetups, searchTerm, selectedCategory, places, cleanText]);
+  });
+
+  return sortBySearchPriority(
+    filtered,
+    searchTerm,
+    (m) => `${m.location || ""} ${m.title || ""}`
+  );
+}, [
+  allMeetups,
+  searchTerm,
+  selectedCategory,
+  places,
+  cleanText,
+  sortBySearchPriority,
+]);
 
   const findPlaceImage = useCallback(() => {
     const typedPlaceName = formData.placeName.toLowerCase().trim();
@@ -417,6 +450,18 @@ const matchedPlace = useMemo(() => {
     return placeName === typedPlaceName;
   });
 }, [formData.placeName, places]);
+
+const sortedPlacesForCreate = useMemo(() => {
+  return sortBySearchPriority(
+    places.filter((place) =>
+      cleanText(place.name || place.title).includes(
+        cleanText(formData.placeName)
+      )
+    ),
+    formData.placeName,
+    (place) => place.name || place.title || ""
+  );
+}, [places, formData.placeName, cleanText, sortBySearchPriority]);
 
   const handleCreateMeetup = async () => {
     if (
@@ -687,15 +732,7 @@ const matchedPlace = useMemo(() => {
   </div>
 </div>
 
-      {recommendedForYou.length > 0 && (
-        <section className="recommendation-section">
-          <h2 className="meetup-section-title">RECOMMENDED FOR YOU</h2>
-
-          <div className="meetup-grid-layout recommendation-grid">
-            {recommendedForYou.map((item) => renderMeetupCard(item, true))}
-          </div>
-        </section>
-      )}
+   
 
       <section className="all-meetups-section">
         <h2 className="meetup-section-title">ALL MEETUPS</h2>
@@ -901,24 +938,53 @@ const matchedPlace = useMemo(() => {
               <div className="input-group">
                 <label>Place Name</label>
 
-                <input type="text" list="places-list" value={formData.placeName}  placeholder="Choose place from database" onChange={(e) =>   setFormData({     ...formData,
-                 placeName: e.target.value,}) } 
-                 />
+                <input
+  type="text"
+  value={formData.placeName}
+  placeholder="Choose place from database"
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      placeName: e.target.value,
+    })
+  }
+/>
 
-                 <datalist id="places-list">
-                  {places.map((place) => (
-                    <option
-                    key={place._id}
-                    value={place.name || place.title}
-                   />
-                   ))}
-                  </datalist>
+{formData.placeName &&
+  sortedPlacesForCreate.some(
+    (place) =>
+      cleanText(place.name || place.title) !==
+      cleanText(formData.placeName)
+  ) && (
+    <div className="places-custom-dropdown">
+      {sortedPlacesForCreate.map((place) => (
+        <div
+          key={place._id}
+          className="places-custom-option"
+          onClick={() => {
+            setFormData({
+              ...formData,
+              placeName: place.name || place.title,
+            });
+          }}
+        >
+          {place.name || place.title}
+        </div>
+      ))}
+    </div>
+)}
 
-                 {formData.placeName && !matchedPlace && (
-                 <p style={{ color: "#ff4d4d", fontSize: "13px", marginTop: "6px" }}>
-                 This place is not available in the database.
-                  </p>
-                 )}
+{formData.placeName && !matchedPlace && (
+  <p
+    style={{
+      color: "#ff4d4d",
+      fontSize: "13px",
+      marginTop: "6px",
+    }}
+  >
+    This place is not available .
+  </p>
+)}
                  </div>
 
                  <div className="date-time-row">
