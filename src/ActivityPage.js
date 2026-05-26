@@ -580,6 +580,9 @@ socketRef.current.on("user_stop_typing", (data) => {
 
   return () => {
     socketRef.current.off("new_notification");
+    socketRef.current.off("receive_meetup_message");
+    socketRef.current.off("user_typing");
+    socketRef.current.off("user_stop_typing");
     socketRef.current.disconnect();
   };
 }, [
@@ -972,12 +975,18 @@ const statsData = [
                   onChatClick={(activity) => {
                     setChatMeetup(activity);
                     setIsChatOpen(true);
+
+                    if (socketRef.current) {
+                      socketRef.current.emit("join_meetup_chat", activity._id);
+                    }
+
                     setUnreadCounts((prev) => ({
-                      ...prev,
+                     ...prev,
                       [activity._id]: 0,
                     }));
+
                     fetchMessages(activity._id);
-                    markMessagesAsRead(activity._id);
+                     markMessagesAsRead(activity._id);
                   }}
                 />
               ))
