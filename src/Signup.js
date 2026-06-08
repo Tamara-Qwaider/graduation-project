@@ -193,7 +193,7 @@ export default function SignupPage() {
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent"
             }}>
-              Kashta
+              SpotOn
             </h1>
           </Link>
 

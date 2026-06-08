@@ -96,7 +96,7 @@ export default function LoginPage() {
               color: "transparent",
             }}
           >
-            VIBE
+            SpotOn
           </h1>
           <p style={{ color: "#e2e8f0" }}>
             Discover amazing places, meet new people
