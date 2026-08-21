@@ -1,70 +1,183 @@
-# Getting Started with Create React App
+# SpotOn
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Smart Meetup Recommendation System
 
-## Available Scripts
+SpotOn is a full-stack web application designed to help users discover meetups and activities based on their interests.
 
-In the project directory, you can run:
+The platform allows users to explore meetups, manage their interests, interact with other users, send messages, receive notifications, and manage their profiles.
 
-### `npm start`
+---
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Features
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- User registration and login
+- User authentication
+- Interest selection and management
+- Meetup discovery
+- Personalized meetup recommendations
+- Meetup details and management
+- Meetup history
+- User profiles
+- Messaging between users
+- Notifications
+- Places and categories
+- Admin dashboard and management
 
-### `npm test`
+---
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Technologies
 
-### `npm run build`
+### Frontend
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- React
+- JavaScript
+- HTML
+- CSS
+- Tailwind CSS
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Backend
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- Node.js
+- Express.js
 
-### `npm run eject`
+### Database
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+- MongoDB
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Other Technologies
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+- Firebase
+- Cloudinary
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+---
 
-## Learn More
+## Project Architecture
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+SpotOn consists of a frontend application and a backend API.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Frontend
 
-### Code Splitting
+The frontend is developed using React and provides the user interface for interacting with the platform.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Backend
 
-### Analyzing the Bundle Size
+The backend is developed using Node.js and Express.js and provides APIs for authentication, users, meetups, messages, notifications, places, and other application functionality.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Database
 
-### Making a Progressive Web App
+MongoDB is used to store application data including users, meetups, messages, notifications, categories, and places.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+### Firebase
 
-### Advanced Configuration
+Firebase is used for authentication and related application services.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### Cloudinary
 
-### Deployment
+Cloudinary is used for managing uploaded images and media.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+---
 
-### `npm run build` fails to minify
+## Project Structure
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```text
+SpotOn
+│
+├── Frontend
+│   ├── src
+│   │   ├── ActivityPage.js
+│   │   ├── AdminPage.jsx
+│   │   ├── Home.js
+│   │   ├── Interests.js
+│   │   ├── LoginPage.js
+│   │   ├── MeetupHistory.js
+│   │   ├── MeetupPage.js
+│   │   ├── Navbar.js
+│   │   ├── Profile.js
+│   │   ├── ProtectedRoute.js
+│   │   └── Signup.js
+│   │
+│   └── package.json
+│
+└── Backend
+    ├── middleware
+    ├── models
+    │   ├── Category.js
+    │   ├── Meetup.js
+    │   ├── Message.js
+    │   ├── Notification.js
+    │   ├── Place.js
+    │   └── User.js
+    │
+    ├── routes
+    │   ├── aiRoutes.js
+    │   ├── authRoutes.js
+    │   ├── categoryRoutes.js
+    │   ├── meetupRoutes.js
+    │   ├── messageRoutes.js
+    │   ├── notificationRoutes.js
+    │   ├── placeRoutes.js
+    │   └── userRoutes.js
+    │
+    └── server.js
+
+---
+
+## Getting Started
+
+### Frontend
+
+```bash
+git clone https://github.com/Tamara-Qwaider/graduation-project.git
+cd graduation-project
+npm install
+npm start
+```
+
+---
+
+### Backend
+
+The backend is available in a separate repository:
+
+https://github.com/Tamara-Qwaider/spots-backend
+
+```bash
+git clone https://github.com/Tamara-Qwaider/spots-backend.git
+cd spots-backend
+npm install
+node server.js
+```
+
+---
+
+## Environment Variables
+
+Sensitive configuration such as database credentials, API keys, and service credentials should be stored in environment variables.
+
+Create a `.env` file locally in the backend project and configure the required environment variables.
+
+For security reasons:
+
+- Do not upload `.env` files to GitHub.
+- Do not expose database credentials.
+- Do not expose private API keys or service secrets.
+
+---
+
+## Author
+
+**Tamara Qwaider**
+
+Software Engineering Graduate – Al-Zaytoonah University of Jordan
+
+**GitHub:**  
+https://github.com/Tamara-Qwaider
+
+**Email:**  
+tamarah.q2004@gmail.com
+
+---
+
+## Graduation Project
+
+SpotOn was developed as a university graduation project in 2026.
